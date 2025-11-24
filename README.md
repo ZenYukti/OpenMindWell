@@ -61,11 +61,12 @@ FRONTEND_URL=http://localhost:3000
 PORT=3001
 ```
 
-**Frontend** (`frontend/.env.local`):
+**Frontend** (`frontend/.env`):
 ```env
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
-NEXT_PUBLIC_API_URL=http://localhost:3001
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_anon_key
+VITE_API_BASE_URL=http://localhost:3001
+VITE_WS_URL=ws://localhost:3001
 ```
 
 5. **Get API keys**
@@ -93,7 +94,7 @@ OpenMindWell is a **self-hosted application**. Each deployment requires:
 **Option 1: Cloud Hosting (Recommended for production)**
 - **Frontend**: [Vercel](https://vercel.com) (free tier)
   1. Import GitHub repository
-  2. Add environment variables from `frontend/.env.local.example`
+  2. Add environment variables from `frontend/.env.example`
   3. Deploy automatically from main branch
   
 - **Backend**: [Render](https://render.com) or [Railway](https://railway.app) (free tier)
@@ -131,7 +132,7 @@ npm install
 
 # Set up environment variables
 cp backend/.env.example backend/.env
-cp frontend/.env.local.example frontend/.env.local
+cp frontend/.env.example frontend/.env
 # Edit .env files with your credentials
 
 # Run both servers
@@ -154,7 +155,7 @@ This comprehensive guide contains:
 ## 🛠️ Tech Stack
 
 **100% Free Services:**
-- **Frontend**: Next.js 14, React, TypeScript, Tailwind CSS → Vercel
+- **Frontend**: React 18, Vite, React Router, TypeScript, Tailwind CSS → Vercel/Netlify
 - **Backend**: Node.js, Express, WebSocket, TypeScript → Render/Railway
 - **Database**: Supabase (PostgreSQL + Auth)
 - **AI**: HuggingFace Inference API (emotion detection)
@@ -164,7 +165,7 @@ This comprehensive guide contains:
 ```
 openmindwell/
 ├── backend/           # Express API + WebSocket server
-├── frontend/          # Next.js application
+├── frontend/          # React + Vite application
 ├── OPENMINDWELL_PROJECT_GUIDE.md
 ├── CONTRIBUTING.md
 └── package.json       # Monorepo scripts
