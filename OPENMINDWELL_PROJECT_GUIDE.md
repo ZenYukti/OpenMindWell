@@ -69,15 +69,22 @@ This platform does NOT provide:
 
 ### 1. **Anonymous Chat Rooms** 💬
 - 6 pre-created support rooms (Anxiety, Depression, PTSD, etc.)
-- Real-time WebSocket messaging
+- **✅ Real-time WebSocket messaging** (fully implemented)
 - Anonymous/pseudonymous usernames
 - Emoji avatars (no photos)
+- Auto-reconnection with exponential backoff
+- Message history (last 50 messages)
+- User join/leave notifications
+- Crisis alerts with helpline numbers
 
 ### 2. **AI Crisis Detection** 🤖
-- HuggingFace emotion analysis on every message
-- Keyword-based fallback system
-- Automatic warning messages with resources
+- **✅ Active in real-time chat** - scans every message
+- HuggingFace emotion analysis (twitter-roberta-base-emotion)
+- Keyword-based fallback system (no API key required)
+- Automatic crisis alerts with US & India helplines
 - 4-tier risk levels (low, medium, high, critical)
+- Visual highlighting of crisis messages (red background)
+- Moderator notifications (backend ready)
 
 ### 3. **Private Journaling** 📝
 - End-to-end private entries (only visible to user)
@@ -245,29 +252,114 @@ This platform does NOT provide:
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+### WebSocket Architecture (Real-Time Chat)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    FRONTEND (React + useWebSocket)              │
+│  ┌───────────────────────────────────────────────────────────┐ │
+│  │  ChatRoom Component:                                      │ │
+│  │  - Message input & display                                │ │
+│  │  - Crisis alert banner                                    │ │
+│  │  - Connection status indicator                            │ │
+│  │                                                             │ │
+│  │  useWebSocket Hook:                                        │ │
+│  │  - Auto-connect on mount                                   │ │
+│  │  - Auto-reconnect (exponential backoff, max 5 attempts)   │ │
+│  │  - Event handlers: onMessage, onConnect, onDisconnect     │ │
+│  │  - sendMessage() function                                  │ │
+│  └───────────────────────────────────────────────────────────┘ │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             │ WebSocket (ws:// or wss://)
+                             │ Events: JOIN, LEAVE, CHAT
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              BACKEND (Express + ws WebSocket Server)            │
+│  ┌───────────────────────────────────────────────────────────┐ │
+│  │  ChatServer Class:                                        │ │
+│  │  - Room Map (roomId → Set<{ws, userId, nickname}>)       │ │
+│  │  - Heartbeat/ping every 30s                               │ │
+│  │  - Message handlers: handleJoin, handleLeave, handleChat │ │
+│  │                                                             │ │
+│  │  Message Flow:                                             │ │
+│  │  1. Receive CHAT event                                     │ │
+│  │  2. Run detectCrisis(content) → riskLevel                 │ │
+│  │  3. Save to DB: {content, risk_level, user_id, room_id}  │ │
+│  │  4. broadcastToRoom() → all connected clients             │ │
+│  │  5. If crisis: send CRISIS_ALERT to sender                │ │
+│  └───────────────────────────────────────────────────────────┘ │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             │ Supabase Client SDK
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                 SUPABASE (PostgreSQL + Storage)                 │
+│  ┌───────────────────────────────────────────────────────────┐ │
+│  │  messages table:                                          │ │
+│  │  - id, room_id, user_id, content                          │ │
+│  │  - risk_level (none, low, medium, high, critical)        │ │
+│  │  - created_at                                              │ │
+│  │                                                             │ │
+│  │  Row Level Security:                                       │ │
+│  │  - Users can read messages in rooms they've joined        │ │
+│  │  - Messages persist for history (last 50 loaded on join)  │ │
+│  └───────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+```
+
 ### Data Flow Examples
 
-**1. User Sends Chat Message:**
+**1. User Joins Chat Room (Full WebSocket Flow):**
 ```
-User types message → Frontend (React) → WebSocket client
-  → Backend WebSocket server → Crisis detection (HuggingFace API)
-  → Save to Supabase (messages table with risk_level)
-  → Broadcast to all users in room (via WebSocket)
-  → Display in chat UI
+User clicks "Join Room" → ChatRoom modal opens
+  → useWebSocket.connect() → WebSocket to ws://localhost:3001
+  → Send JOIN {roomId, userId, nickname}
+  → Backend: add to rooms Map
+  → Backend: SELECT last 50 messages WHERE room_id = ?
+  → Send HISTORY {messages: [...]} to client
+  → Frontend: setMessages(history)
+  → User sees chat interface with history
 ```
 
-**2. User Creates Journal Entry:**
+**2. User Sends Message with Crisis Content:**
+```
+User types "I feel hopeless" → clicks Send
+  → useWebSocket.sendMessage(content)
+  → Send CHAT {roomId, userId, content, timestamp}
+  → Backend: detectCrisis(content) → {riskLevel: "medium", isCrisis: true}
+  → Backend: INSERT INTO messages (content, risk_level)
+  → Backend: broadcastToRoom(CHAT message with risk_level)
+  → All users receive message
+  → Frontend: render with red background (crisis styling)
+  → Backend: send CRISIS_ALERT to sender only
+  → Sender sees: "⚠️ CRISIS DETECTED - Call 988 | 9152987821"
+```
+
+**3. User Creates Journal Entry:**
 ```
 User writes entry → Frontend form → HTTP POST /api/journal
   → Backend validates JWT → Supabase insert (with RLS check)
   → Return success → Update UI
 ```
 
-**3. User Joins Chat Room:**
+**3. User Joins Chat Room (Full Implementation):**
 ```
-User clicks room → WebSocket send "join" event
-  → Backend adds user to room map → Fetch last 50 messages
-  → Send message history to user → User sees chat
+User clicks "Join Room" → ChatRoom modal opens
+  → useWebSocket hook connects to ws://localhost:3001
+  → Send JOIN message {roomId, userId, nickname}
+  → Backend validates & adds user to room Map
+  → Backend fetches last 50 messages from DB
+  → Frontend receives HISTORY message → displays messages
+  → User types message → sends CHAT event
+  → Backend runs detectCrisis() on message content
+  → Backend saves to DB with risk_level
+  → Backend broadcasts to all room members
+  → If crisis detected: sends CRISIS_ALERT to sender
+  → Frontend shows red banner with helplines
+  → Auto-scroll to latest message
 ```
 
 ---
@@ -292,45 +384,52 @@ openmindwell/
 │   │   │   ├── rooms.ts                  # Room & message queries
 │   │   │   └── moderation.ts             # Reporting & flagging
 │   │   ├── services/
-│   │   │   ├── crisisDetection.ts        # AI + keyword analysis
-│   │   │   └── chatServer.ts             # WebSocket server logic
+│   │   │   ├── crisisDetection.ts        # ✅ AI + keyword crisis detection
+│   │   │   └── chatServer.ts             # ✅ WebSocket server (COMPLETE)
 │   │   ├── scripts/
 │   │   │   └── setupDatabase.ts          # Helper for DB setup
-│   │   └── index.ts                      # Main Express server
+│   │   └── index.ts                      # Main Express server + WS init
 │   ├── database/
 │   │   └── schema.sql                    # PostgreSQL schema (CRITICAL)
 │   ├── .env.example                      # Backend env template
 │   ├── Dockerfile                        # Docker container config
-│   ├── Dockerfile                        # Docker container config
-│   ├── DEPLOYMENT.md                     # Backend deploy guide
 │   ├── package.json                      # Backend dependencies
 │   └── tsconfig.json                     # TypeScript config
 │
-├── frontend/                             # Next.js frontend
+├── frontend/                             # React + Vite frontend
 │   ├── src/
-│   │   ├── app/
-│   │   │   ├── layout.tsx                # Root layout
-│   │   │   ├── page.tsx                  # Landing page
-│   │   │   ├── onboarding/
-│   │   │   │   └── page.tsx              # Anonymous signup
-│   │   │   ├── dashboard/
-│   │   │   │   └── page.tsx              # Main app UI
-│   │   │   └── globals.css               # Global styles
-│   │   └── lib/
-│   │       ├── supabase.ts               # Supabase client
-│   │       └── api.ts                    # API client functions
-│   ├── .env.local.example                # Frontend env template
-│   ├── next.config.js                    # Next.js config
+│   │   ├── components/
+│   │   │   └── ChatRoom.tsx              # ✅ Real-time chat UI (NEW)
+│   │   ├── hooks/
+│   │   │   └── useWebSocket.ts           # ✅ WebSocket client hook (NEW)
+│   │   ├── pages/
+│   │   │   ├── Home.tsx                  # Landing page
+│   │   │   ├── Onboarding.tsx            # Nickname setup
+│   │   │   └── Dashboard.tsx             # ✅ Updated with ChatRoom
+│   │   ├── lib/
+│   │   │   ├── api.ts                    # REST API client
+│   │   │   └── supabase.ts               # Supabase auth client
+│   │   ├── App.tsx                       # React Router config
+│   │   ├── main.tsx                      # App entry point
+│   │   └── index.css                     # Tailwind styles
+│   ├── .env.example                      # Frontend env template
+│   ├── Dockerfile                        # ✅ Container config (NEW)
+│   ├── nginx.conf                        # ✅ Production server (NEW)
+│   ├── vite.config.ts                    # Vite configuration
 │   ├── tailwind.config.ts                # Tailwind config
 │   ├── postcss.config.js                 # PostCSS config
 │   ├── package.json                      # Frontend dependencies
 │   └── tsconfig.json                     # TypeScript config
 │
 ├── .github/                              # (Future) CI/CD workflows
-├── .vscode/
-│   └── extensions.json                   # Recommended extensions
-│
-├── .env.example                          # Root env template
+├── docker-compose.yml                    # ✅ Self-hosting deployment (NEW)
+├── .gitignore
+├── OPENMINDWELL_PROJECT_GUIDE.md         # 📖 Complete guide (UPDATED)
+├── README.md
+├── CONTRIBUTING.md
+├── PROJECT_SUMMARY.md                    # Quick reference
+├── LICENSE
+└── package.json                          # Root scripts (npm run dev)
 ├── .gitignore                            # Git ignore rules
 ├── package.json                          # Monorepo scripts
 ├── README.md                             # Project README
@@ -505,14 +604,21 @@ This starts:
 #### 11. Test the Application
 
 1. Open http://localhost:3000 in your browser
-2. You should see the landing page with disclaimers
+2. You should see the landing page with crisis disclaimers
 3. Click **"Get Started"**
 4. Enter a nickname (e.g., `TestUser123`)
 5. Select an avatar emoji
 6. Click **"Continue"**
 7. You should see the dashboard with 4 tabs
-8. Click **"Rooms"** to see 6 pre-created chat rooms
-9. Click a room to join (chat interface coming soon)
+8. Click **"Support Rooms"** tab → see 6 pre-created rooms
+9. **✅ Click "Join Room →"** on any room
+10. **✅ Chat modal opens** with real-time WebSocket connection
+11. **✅ Type a message** and press Send → see it appear instantly
+12. **✅ Test crisis detection**: Type "I feel hopeless" → see message highlighted
+13. **✅ Test crisis alert**: Type "I want to hurt myself" → red banner appears with helplines
+14. Open a second browser window (incognito) and join the same room with a different nickname
+15. **✅ Send messages between windows** → see real-time sync
+16. Close one window → see "User left the room" notification
 
 #### 12. Verify Database
 
@@ -940,13 +1046,22 @@ OpenMindWell uses PostgreSQL Row Level Security to ensure data privacy:
 
 ### Development Workflow
 
-1. **Fork** the repository
+1. **Fork** the repository on GitHub
 2. **Clone** your fork: `git clone https://github.com/yourusername/openmindwell.git`
-3. **Create branch**: `git checkout -b feature/your-feature`
-4. **Make changes** and test locally
-5. **Commit**: `git commit -m "feat: add new feature"`
-6. **Push**: `git push origin feature/your-feature`
-7. **Open Pull Request** on GitHub
+3. **Install dependencies**: `npm install` (root, then backend, then frontend)
+4. **Set up environment**: Copy `.env.example` files and configure
+5. **Apply DB schema**: Run `schema.sql` in Supabase SQL Editor
+6. **Create branch**: `git checkout -b feature/your-feature`
+7. **Start dev servers**: `npm run dev` from root directory
+8. **Make changes** and test locally:
+   - Backend changes: Check http://localhost:3001/health
+   - Frontend changes: Hot reload at http://localhost:3000
+   - WebSocket changes: Test in chat rooms with multiple browser tabs
+   - Database changes: Verify in Supabase Table Editor
+9. **Test crisis detection**: Send messages with keywords like "hopeless", "suicide"
+10. **Commit**: `git commit -m "feat: add new feature"`
+11. **Push**: `git push origin feature/your-feature`
+12. **Open Pull Request** on GitHub with description of changes
 
 ### Commit Message Convention
 
@@ -993,24 +1108,32 @@ docs: update deployment guide for Railway
 
 ## 🗺️ Roadmap
 
-### Phase 1: Foundation (Current)
+### Phase 1: Foundation ✅ COMPLETE
 - [x] Anonymous authentication
-- [x] Basic chat rooms
-- [x] AI crisis detection
+- [x] Basic chat rooms (6 pre-created)
+- [x] **Real-time chat UI (WebSocket client)** ✅ NEW
+- [x] **WebSocket auto-reconnection** ✅ NEW
+- [x] **Message history loading** ✅ NEW
+- [x] **User join/leave events** ✅ NEW
+- [x] AI crisis detection (HuggingFace + keywords)
+- [x] **Crisis alerts in chat** ✅ NEW
 - [x] Private journaling
 - [x] Habit tracking
 - [x] Resource library
-- [x] Moderation system
-- [x] Deployment configs
+- [x] Moderation system (backend ready)
+- [x] **Self-hosting deployment (Docker)** ✅ NEW
+- [x] **Production Nginx config** ✅ NEW
 
 ### Phase 2: Enhanced UX (Next 3 Months)
-- [ ] Real-time chat UI (WebSocket client)
-- [ ] Notification system (new messages, mentions)
-- [ ] User profiles (bio, status)
-- [ ] Direct messaging (1-on-1)
+- [ ] Notification system (new messages, @mentions)
+- [ ] User profiles (bio, status, preferred pronouns)
+- [ ] Direct messaging (1-on-1 private chats)
 - [ ] Emoji reactions on messages
+- [ ] Message editing/deletion
 - [ ] Dark mode toggle
-- [ ] Mobile-responsive improvements
+- [ ] Mobile-responsive chat improvements
+- [ ] Voice messages (optional)
+- [ ] File sharing (images only, moderated)
 
 ### Phase 3: Community Features (3-6 Months)
 - [ ] Guided meditation audio
