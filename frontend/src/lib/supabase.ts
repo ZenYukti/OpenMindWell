@@ -1,56 +1,36 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js'
+import type { Database } from './database.types'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL!;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY!;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey)
 
-// Helper to get current session
-export async function getSession() {
-  const { data: { session } } = await supabase.auth.getSession();
-  return session;
+// Generate anonymous username
+export const generateUsername = (): string => {
+  const adjectives = [
+    'Calm', 'Gentle', 'Kind', 'Peaceful', 'Brave', 'Hopeful', 'Serene',
+    'Radiant', 'Mindful', 'Resilient', 'Graceful', 'Warm', 'Bright'
+  ]
+  const nouns = [
+    'Soul', 'Spirit', 'Heart', 'Mind', 'Light', 'Star', 'Moon',
+    'Ocean', 'River', 'Mountain', 'Cloud', 'Phoenix', 'Lotus'
+  ]
+  const adj = adjectives[Math.floor(Math.random() * adjectives.length)]
+  const noun = nouns[Math.floor(Math.random() * nouns.length)]
+  const num = Math.floor(Math.random() * 999)
+  return `${adj}${noun}${num}`
 }
 
-// Helper to get current user
-export async function getCurrentUser() {
-  const { data: { user } } = await supabase.auth.getUser();
-  return user;
+// Anonymous sign in
+export const signInAnonymously = async () => {
+  const { data, error } = await supabase.auth.signInAnonymously()
+  if (error) throw error
+  return data
 }
 
-// Helper to sign in anonymously
-export async function signInAnonymously() {
-  const { data, error } = await supabase.auth.signInAnonymously();
-  return { data, error };
-}
-
-// Helper to sign out
-export async function signOut() {
-  const { error } = await supabase.auth.signOut();
-  return { error };
-}
-
-// Helper to create user profile
-export async function createProfile(userId: string, nickname: string, avatar: string) {
-  const { data, error } = await supabase
-    .from('profiles')
-    .insert({
-      user_id: userId,
-      nickname,
-      avatar,
-    })
-    .select()
-    .single();
-
-  return { data, error };
-}
-
-// Helper to get user profile
-export async function getProfile(userId: string) {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('user_id', userId)
-    .single();
-
-  return { data, error };
+// Sign out
+export const signOut = async () => {
+  const { error } = await supabase.auth.signOut()
+  if (error) throw error
 }

@@ -1,321 +1,287 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { getSession, getCurrentUser, getProfile, signOut } from '../lib/supabase';
-import { roomsApi, resourcesApi } from '../lib/api';
-import ChatRoom from '../components/ChatRoom';
+import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
+import { 
+  MessageCircle, BookOpen, Target, TrendingUp, 
+  Calendar, ArrowRight, Plus, CheckCircle2, Flame
+} from 'lucide-react'
+import { useAuthStore } from '@/store/authStore'
+import { supabase } from '@/lib/supabase'
+import { formatDate, getMoodEmoji, getGreeting } from '@/lib/utils'
+import type { MoodEntry, Habit, HabitLog } from '@/lib/database.types'
 
-type Tab = 'rooms' | 'journal' | 'habits' | 'resources';
+interface DashboardStats {
+  journalCount: number
+  chatRooms: number
+  streakDays: number
+  moodAvg: number
+}
 
 export default function Dashboard() {
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<Tab>('rooms');
-  const [profile, setProfile] = useState<any>(null);
-  const navigate = useNavigate();
+  const { profile } = useAuthStore()
+  const [stats, setStats] = useState<DashboardStats>({
+    journalCount: 0,
+    chatRooms: 0,
+    streakDays: 0,
+    moodAvg: 0,
+  })
+  const [recentMoods, setRecentMoods] = useState<MoodEntry[]>([])
+  const [todayHabits, setTodayHabits] = useState<(Habit & { completed: boolean })[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    checkAuth();
-  }, []);
+    loadDashboardData()
+  }, [])
 
-  async function checkAuth() {
-    const session = await getSession();
-    if (!session) {
-      navigate('/');
-      return;
+  const loadDashboardData = async () => {
+    try {
+      const userId = profile?.id
+      if (!userId) return
+
+      const today = new Date().toISOString().split('T')[0]
+
+      const [journalsRes, moodsRes, habitsRes, logsRes] = await Promise.all([
+        supabase.from('journal_entries').select('id', { count: 'exact' }).eq('user_id', userId),
+        supabase.from('mood_entries').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(7),
+        supabase.from('habits').select('*').eq('user_id', userId).eq('is_active', true),
+        supabase.from('habit_logs').select('*').eq('user_id', userId).eq('date', today),
+      ])
+
+      setStats({
+        journalCount: journalsRes.count || 0,
+        chatRooms: 5,
+        streakDays: calculateStreak(logsRes.data || []),
+        moodAvg: calculateMoodAvg(moodsRes.data || []),
+      })
+
+      setRecentMoods(moodsRes.data || [])
+
+      const habits = habitsRes.data || []
+      const logs = logsRes.data || []
+      setTodayHabits(
+        habits.map((h) => ({
+          ...h,
+          completed: logs.some((l: HabitLog) => l.habit_id === h.id),
+        }))
+      )
+    } catch (error) {
+      console.error('Error loading dashboard:', error)
+    } finally {
+      setLoading(false)
     }
-
-    const user = await getCurrentUser();
-    if (user) {
-      const { data } = await getProfile(user.id);
-      setProfile(data);
-    }
-
-    setLoading(false);
   }
 
-  async function handleSignOut() {
-    await signOut();
-    navigate('/');
+  const calculateStreak = (logs: HabitLog[]): number => {
+    return logs.length > 0 ? Math.min(logs.length, 7) : 0
+  }
+
+  const calculateMoodAvg = (moods: MoodEntry[]): number => {
+    if (moods.length === 0) return 0
+    const sum = moods.reduce((acc, m) => acc + m.mood_score, 0)
+    return Math.round((sum / moods.length) * 10) / 10
+  }
+
+  const toggleHabit = async (habitId: string, completed: boolean) => {
+    const userId = profile?.id
+    if (!userId) return
+
+    const today = new Date().toISOString().split('T')[0]
+
+    if (completed) {
+      await supabase.from('habit_logs').delete().eq('habit_id', habitId).eq('date', today)
+    } else {
+      await supabase.from('habit_logs').insert({ habit_id: habitId, user_id: userId, date: today })
+    }
+
+    setTodayHabits((prev) =>
+      prev.map((h) => (h.id === habitId ? { ...h, completed: !completed } : h))
+    )
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
-        </div>
+      <div className="flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-2 border-slate-200 border-t-slate-900 dark:border-slate-700 dark:border-t-white rounded-full animate-spin" />
       </div>
-    );
+    )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Crisis Banner */}
-      <div className="bg-red-600 text-white py-2 px-4 text-center text-xs">
-        ⚠️ IN CRISIS? 🇺🇸 988 | 🇮🇳 9152987821 (iCall) | KIRAN 1800-599-0019
-      </div>
-
-      {/* Header */}
-      <header className="bg-white shadow-sm">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="text-3xl">{profile?.avatar || '😊'}</div>
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">{profile?.nickname || 'User'}</h1>
-              <p className="text-sm text-gray-500">OpenMindWell by ZenYukti</p>
-            </div>
+    <div className="space-y-6 animate-fade-in">
+      {/* Welcome Section */}
+      <div className="bg-gradient-to-br from-primary-50 to-primary-200 dark:from-primary-950 dark:to-primary-900 border border-primary-200 dark:border-primary-800 rounded-lg p-5">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">{formatDate(new Date().toISOString())}</p>
+            <h1 className="text-xl font-semibold text-primary-700 dark:text-primary-300">
+              {getGreeting()}, {profile?.display_name || 'there'}
+            </h1>
+            <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">How are you feeling today?</p>
           </div>
-          <button onClick={handleSignOut} className="text-sm text-gray-600 hover:text-gray-900">
-            Sign Out
-          </button>
-        </div>
-      </header>
-
-      {/* Tabs */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="container mx-auto px-4">
-          <nav className="flex gap-8">
-            <TabButton active={activeTab === 'rooms'} onClick={() => setActiveTab('rooms')}>
-              💬 Rooms
-            </TabButton>
-            <TabButton active={activeTab === 'journal'} onClick={() => setActiveTab('journal')}>
-              📝 Journal
-            </TabButton>
-            <TabButton active={activeTab === 'habits'} onClick={() => setActiveTab('habits')}>
-              ✅ Habits
-            </TabButton>
-            <TabButton active={activeTab === 'resources'} onClick={() => setActiveTab('resources')}>
-              📚 Resources
-            </TabButton>
-          </nav>
-        </div>
-      </div>
-
-      {/* Content */}
-      <main className="container mx-auto px-4 py-8">
-        {activeTab === 'rooms' && <RoomsTab />}
-        {activeTab === 'journal' && <JournalTab />}
-        {activeTab === 'habits' && <HabitsTab />}
-        {activeTab === 'resources' && <ResourcesTab />}
-      </main>
-    </div>
-  );
-}
-
-function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors ${
-        active
-          ? 'border-primary-600 text-primary-600'
-          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function RoomsTab() {
-  const [rooms, setRooms] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedRoom, setSelectedRoom] = useState<any | null>(null);
-  const [currentUser, setCurrentUser] = useState<any>(null);
-
-  useEffect(() => {
-    loadRooms();
-    loadCurrentUser();
-  }, []);
-
-  async function loadRooms() {
-    try {
-      const data = await roomsApi.getAll();
-      setRooms(data);
-    } catch (error) {
-      console.error('Error loading rooms:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function loadCurrentUser() {
-    const user = await getCurrentUser();
-    if (user) {
-      const { data } = await getProfile(user.id);
-      setCurrentUser({
-        id: user.id,
-        nickname: data?.nickname || 'Anonymous',
-      });
-    }
-  }
-
-  function handleJoinRoom(room: any) {
-    if (!currentUser) {
-      alert('Please wait, loading user information...');
-      return;
-    }
-    setSelectedRoom(room);
-  }
-
-  if (loading) {
-    return <div className="text-center py-8">Loading rooms...</div>;
-  }
-
-  return (
-    <div>
-      <h2 className="text-2xl font-bold mb-6 text-gray-900">Support Rooms</h2>
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {rooms.map((room) => (
-          <div key={room.id} className="card hover:shadow-lg transition-shadow">
-            <div className="flex items-start gap-3 mb-3">
-              <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <span className="text-primary-600 text-lg">💬</span>
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold mb-1">{room.name}</h3>
-                <p className="text-xs text-gray-500">{room.member_count || 0} members online</p>
-              </div>
-            </div>
-            <p className="text-sm text-gray-600 mb-4">{room.description}</p>
-            <button
-              onClick={() => handleJoinRoom(room)}
-              className="btn-primary w-full text-sm"
+          <div className="flex gap-2">
+            <Link
+              to="/app/mood"
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-900 dark:bg-white 
+                       text-white dark:text-slate-900 rounded-lg text-sm font-medium
+                       hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors"
             >
-              Join Room →
-            </button>
+              <Plus size={14} /> Log Mood
+            </Link>
+            <Link
+              to="/app/journal"
+              className="inline-flex items-center gap-1.5 px-3 py-2 border border-slate-200 
+                       dark:border-slate-700 rounded-lg text-sm font-medium
+                       hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+            >
+              <BookOpen size={14} /> Journal
+            </Link>
           </div>
-        ))}
-      </div>
-
-      {/* Chat Room Modal */}
-      {selectedRoom && currentUser && (
-        <ChatRoom
-          room={selectedRoom}
-          currentUser={currentUser}
-          onClose={() => setSelectedRoom(null)}
-        />
-      )}
-
-      <div className="mt-6 bg-green-50 border border-green-200 rounded-lg p-4">
-        <p className="text-sm text-green-900">
-          ✅ <strong>Real-time chat is now active!</strong> Join a room to connect with others anonymously.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function JournalTab() {
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">My Journal</h2>
-        <button className="btn-primary">+ New Entry</button>
-      </div>
-
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
-        <p className="text-yellow-900">
-          📝 <strong>Journal feature coming soon!</strong> Track your thoughts, moods, and reflections.
-        </p>
-        <p className="text-sm text-yellow-800 mt-2">
-          All journal entries are completely private and only visible to you.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function HabitsTab() {
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">My Habits</h2>
-        <button className="btn-primary">+ New Habit</button>
-      </div>
-
-      <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
-        <p className="text-green-900">
-          ✅ <strong>Habit tracking coming soon!</strong> Build positive daily routines.
-        </p>
-        <p className="text-sm text-green-800 mt-2">
-          Track streaks, log completions, and celebrate your progress.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function ResourcesTab() {
-  const [resources, setResources] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<string>('');
-
-  useEffect(() => {
-    loadResources();
-  }, [filter]);
-
-  async function loadResources() {
-    try {
-      const data = await resourcesApi.getAll(filter || undefined);
-      setResources(data);
-    } catch (error) {
-      console.error('Error loading resources:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  if (loading) {
-    return <div className="text-center py-8">Loading resources...</div>;
-  }
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Mental Health Resources</h2>
-        <select
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="input-field max-w-xs"
-        >
-          <option value="">All Categories</option>
-          <option value="hotline">Crisis Hotlines</option>
-          <option value="article">Articles</option>
-          <option value="exercise">Exercises</option>
-          <option value="video">Videos</option>
-        </select>
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-4">
-        {resources.map((resource) => (
-          <div key={resource.id} className="card">
-            <div className="flex items-start justify-between mb-2">
-              <h3 className="text-lg font-semibold">{resource.title}</h3>
-              <span className="text-xs bg-primary-100 text-primary-700 px-2 py-1 rounded">
-                {resource.category}
-              </span>
-            </div>
-            <p className="text-sm text-gray-600 mb-4">{resource.description}</p>
-            {resource.url && (
-              <a
-                href={resource.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary-600 hover:text-primary-700 text-sm font-medium"
-              >
-                Learn More →
-              </a>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {resources.length === 0 && (
-        <div className="text-center py-12 text-gray-500">
-          No resources found in this category.
         </div>
-      )}
+      </div>
+
+      {/* Quick Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <StatCard icon={BookOpen} label="Journal Entries" value={stats.journalCount} />
+        <StatCard icon={MessageCircle} label="Chat Rooms" value={stats.chatRooms} />
+        <StatCard icon={Flame} label="Day Streak" value={stats.streakDays} suffix="" />
+        <StatCard icon={TrendingUp} label="Avg Mood" value={stats.moodAvg || '-'} />
+      </div>
+
+      {/* Main Content Grid */}
+      <div className="grid md:grid-cols-2 gap-4">
+        {/* Today's Habits */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold flex items-center gap-2 text-slate-900 dark:text-white">
+              <Target size={16} className="text-slate-400" />
+              Today's Habits
+            </h2>
+            <Link to="/app/habits" className="text-xs text-accent-600 hover:text-accent-700 flex items-center gap-1 font-medium">
+              View All <ArrowRight size={12} />
+            </Link>
+          </div>
+
+          {todayHabits.length === 0 ? (
+            <div className="text-center py-8">
+              <Target className="w-8 h-8 text-slate-300 mx-auto mb-3" />
+              <p className="text-sm text-slate-500 mb-3">No habits set up yet</p>
+              <Link
+                to="/app/habits"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 dark:bg-white 
+                         text-white dark:text-slate-900 rounded-lg text-xs font-medium"
+              >
+                <Plus size={12} /> Create habit
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {todayHabits.slice(0, 5).map((habit) => (
+                <button
+                  key={habit.id}
+                  onClick={() => toggleHabit(habit.id, habit.completed)}
+                  className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors text-left ${
+                    habit.completed
+                      ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
+                      : 'bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors ${
+                    habit.completed 
+                      ? 'bg-green-500 text-white' 
+                      : 'border-2 border-slate-300 dark:border-slate-600'
+                  }`}>
+                    {habit.completed && <CheckCircle2 size={12} />}
+                  </div>
+                  <span className={`flex-1 text-sm font-medium ${
+                    habit.completed ? 'text-green-700 dark:text-green-400' : 'text-slate-700 dark:text-slate-300'
+                  }`}>{habit.name}</span>
+                  <span className="text-lg">{habit.emoji || ''}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Mood Trend */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold flex items-center gap-2 text-slate-900 dark:text-white">
+              <TrendingUp size={16} className="text-slate-400" />
+              Recent Moods
+            </h2>
+            <Link to="/app/mood" className="text-xs text-accent-600 hover:text-accent-700 flex items-center gap-1 font-medium">
+              Details <ArrowRight size={12} />
+            </Link>
+          </div>
+
+          {recentMoods.length === 0 ? (
+            <div className="text-center py-8">
+              <TrendingUp className="w-8 h-8 text-slate-300 mx-auto mb-3" />
+              <p className="text-sm text-slate-500 mb-3">No mood entries yet</p>
+              <Link
+                to="/app/mood"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 dark:bg-white 
+                         text-white dark:text-slate-900 rounded-lg text-xs font-medium"
+              >
+                <Plus size={12} /> Log mood
+              </Link>
+            </div>
+          ) : (
+            <div className="flex items-end justify-between h-32 gap-2 pt-4">
+              {recentMoods.slice(0, 7).reverse().map((mood) => (
+                <div key={mood.id} className="flex-1 flex flex-col items-center gap-2">
+                  <span className="text-xl">{getMoodEmoji(mood.mood_score)}</span>
+                  <div className="w-full">
+                    <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-accent-500 rounded-full transition-all duration-300"
+                        style={{ width: `${(mood.mood_score / 5) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                  <span className="text-xs text-slate-400">
+                    {new Date(mood.created_at).toLocaleDateString('en', { weekday: 'short' })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Date Footer */}
+      <div className="text-center py-3">
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 
+                      rounded-full text-xs text-slate-500">
+          <Calendar size={12} />
+          {formatDate(new Date().toISOString())}
+        </div>
+      </div>
     </div>
-  );
+  )
+}
+
+function StatCard({ 
+  icon: Icon, 
+  label, 
+  value,
+  suffix
+}: { 
+  icon: React.ElementType
+  label: string
+  value: string | number
+  suffix?: string
+}) {
+  return (
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4 
+                   hover:border-slate-300 dark:hover:border-slate-700 transition-colors">
+      <div className="w-8 h-8 bg-slate-100 dark:bg-slate-800 rounded-lg flex items-center justify-center mb-3">
+        <Icon size={16} className="text-slate-500" />
+      </div>
+      <div className="flex items-baseline gap-1">
+        <p className="text-2xl font-semibold text-slate-900 dark:text-white">{value}</p>
+        {suffix && <span className="text-sm">{suffix}</span>}
+      </div>
+      <p className="text-xs text-slate-500 mt-1">{label}</p>
+    </div>
+  )
 }
