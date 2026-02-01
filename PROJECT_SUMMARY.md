@@ -4,30 +4,20 @@
 
 ## ✅ What Has Been Created
 
-### 1. **Backend** (Node.js + Express + TypeScript + WebSocket)
+### 1. **Backend** (Node.js + Express + TypeScript)
 - ✅ Complete REST API for journal, habits, resources, rooms, moderation
-- ✅ **WebSocket chat server with real-time messaging** (FULLY IMPLEMENTED)
-- ✅ **Room-based chat architecture** with user join/leave events
-- ✅ **Auto-reconnection with heartbeat/ping** (30s interval)
-- ✅ **Message history** (last 50 messages loaded on room join)
+- ✅ WebSocket chat server with real-time messaging
 - ✅ AI-powered crisis detection (HuggingFace API + keyword fallback)
-- ✅ **Crisis alerts broadcast in real-time** with helpline numbers
 - ✅ Supabase integration (PostgreSQL + Auth)
 - ✅ Rate limiting and security middleware
-- ✅ Deployment configs (Dockerfile for self-hosting)
+- ✅ Deployment configs (Dockerfile, render.yaml)
 - ✅ Database schema with Row Level Security
 
-### 2. **Frontend** (React 18 + Vite + TypeScript + Tailwind CSS)
-- ✅ Landing page with crisis disclaimers
+### 2. **Frontend** (React 18 + Vite + TypeScript + Tailwind)
+- ✅ Landing page with disclaimers
 - ✅ Anonymous onboarding flow
 - ✅ Dashboard with tabbed navigation
-- ✅ **Real-time chat UI (ChatRoom component)** - FULLY FUNCTIONAL
-- ✅ **useWebSocket custom hook** with auto-reconnect
-- ✅ **Crisis alert banners** with US & India helplines
-- ✅ **Message history display** with auto-scroll
-- ✅ **Connection status indicators**
-- ✅ **Visual crisis highlighting** (red background for high-risk messages)
-- ✅ Support rooms interface with "Join Room" functionality
+- ✅ Support rooms interface
 - ✅ Journal, habits, resources tabs
 - ✅ Responsive design with Tailwind CSS
 - ✅ Supabase Auth integration
@@ -49,7 +39,7 @@
   - Environment variable reference
   - Step-by-step local setup
   - Free service account creation guides
-  - Self-hosting deployment instructions (Docker, VPS)
+  - Deployment instructions (Vercel, Render, Railway)
   - Security and privacy guidelines
   - Contribution guide with code of conduct
   - Future roadmap
@@ -59,12 +49,9 @@
 
 ### 5. **Deployment Ready**
 - ✅ All environment variable configs
-- ✅ **Docker Compose setup** (frontend + backend)
-- ✅ **Frontend Dockerfile** (multi-stage build with Nginx)
-- ✅ **Backend Dockerfile** with health checks
-- ✅ **Nginx configuration** for production
-- ✅ WebSocket proxy support (ws:// and wss://)
-- ✅ Self-hosting configuration (VPS, home server, Raspberry Pi)
+- ✅ Docker support
+- ✅ Render.com configuration
+- ✅ Vercel configuration
 - ✅ Health check endpoint
 - ✅ CORS properly configured
 
@@ -98,16 +85,13 @@ Visit: http://localhost:3000
 
 3. **Test locally**:
    - Create anonymous account
-   - **Join a chat room** → Real-time WebSocket chat
-   - **Send messages** → See instant delivery
-   - **Test crisis detection** → Type "I feel hopeless"
-   - **Multi-tab test** → Open 2 browsers, chat between them
+   - Join a chat room
    - Create journal entry
    - Log a habit
 
 4. **Deploy** (optional):
-   - Self-host on VPS (DigitalOcean, Linode, AWS EC2)
-   - Or run on home server / Raspberry Pi
+   - Backend → Render or Railway
+   - Frontend → Vercel
 
 ## 🔒 Safety Features
 
@@ -121,51 +105,43 @@ Visit: http://localhost:3000
 
 ## 🌟 Key Features
 
-- **✅ Anonymous Chat Rooms** - 6 pre-created support topics with REAL-TIME messaging
-- **✅ WebSocket Communication** - Instant message delivery, auto-reconnection, presence tracking
-- **✅ AI Crisis Detection** - HuggingFace emotion analysis + keyword patterns (active in chat)
-- **✅ Crisis Alerts** - Real-time red banners with US (988) & India (9152987821) helplines
+- **Anonymous Chat Rooms** - 6 pre-created support topics
+- **AI Crisis Detection** - HuggingFace emotion analysis
 - **Private Journaling** - Mood tracking and tags
 - **Habit Tracking** - Streaks and completion logs
 - **Resource Library** - Hotlines, exercises, articles
-- **Volunteer System** - Moderation and support roles (backend ready)
+- **Volunteer System** - Moderation and support roles
 
-## 📊 Self-Hosted Stack
+## 📊 100% Free Stack
 
-- **Database**: Supabase (free tier: 500MB DB, 2GB bandwidth/month) or self-hosted PostgreSQL
-- **AI Detection**: HuggingFace (free tier: 1000 API calls/day) or keyword-based fallback
-- **Hosting**: Your own server (VPS ~$5/month or free on home server)
+- Supabase (500MB DB, 2GB bandwidth/month)
+- HuggingFace (1000 API calls/day)
+- Vercel (unlimited bandwidth)
+- Render/Railway (750 hours/month)
 
-**Cost: $0-5/month depending on hosting choice**
+**Total Cost: $0**
 
 ## 📁 File Structure
 
 ```
 openmindwell/
-├── backend/                 # Node.js + Express + WebSocket
+├── backend/                 # Node.js backend
 │   ├── src/
-│   │   ├── index.ts        # Main server + WebSocket init
-│   │   ├── routes/         # REST API endpoints
-│   │   ├── services/       # ✅ chatServer.ts + crisisDetection.ts
+│   │   ├── index.ts        # Main server
+│   │   ├── routes/         # API endpoints
+│   │   ├── services/       # Chat & AI
 │   │   └── middleware/     # Auth, security
-│   ├── database/
-│   │   └── schema.sql      # Complete DB schema
-│   └── Dockerfile          # Container config
+│   └── database/
+│       └── schema.sql      # Complete DB schema
 │
-├── frontend/               # React + Vite + WebSocket
-│   ├── src/
-│   │   ├── components/     # ✅ ChatRoom.tsx (NEW)
-│   │   ├── hooks/          # ✅ useWebSocket.ts (NEW)
-│   │   ├── pages/          # Home, Dashboard, Onboarding
-│   │   └── lib/            # API clients
-│   ├── Dockerfile          # ✅ Multi-stage build (NEW)
-│   └── nginx.conf          # ✅ Production server (NEW)
+├── frontend/               # React + Vite frontend
+│   └── src/
+│       ├── pages/         # Page components
+│       └── lib/           # API clients
 │
-├── docker-compose.yml      # ✅ Full stack deployment (NEW)
-├── OPENMINDWELL_PROJECT_GUIDE.md  # 📖 Complete guide (UPDATED)
+├── OPENMINDWELL_PROJECT_GUIDE.md  # 📖 Complete guide
 ├── README.md
 ├── CONTRIBUTING.md
-├── PROJECT_SUMMARY.md      # This file
 └── package.json
 ```
 
@@ -206,7 +182,7 @@ All contributions welcome - from typo fixes to major features!
 
 - GitHub Issues: Bug reports and feature requests
 - GitHub Discussions: Questions and ideas
-- Email: support@zenyukti.in (TODO: set up)
+- Email: support@openmindwell.org (TODO: set up)
 
 ---
 
