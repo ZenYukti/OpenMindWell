@@ -1,0 +1,34 @@
+# Welcome Bot Configuration for ZenYukti
+
+# When someone opens their first ever ISSUE
+newIssueWelcomeComment: >
+  ![ZenYukti Banner](https://github.com/ZenYukti/zenyukti.github.io/blob/main/public/assets/branding/Cheers_GitHub_Banner.png?raw=true)
+  ## Welcome to the ZenYukti Community! 🚀
+
+  Thank you for opening your first issue! We believe that every great project starts with a single conversation. Our team will review this shortly.
+
+  **While you wait, feel free to:**
+  * Check our **[CONTRIBUTING Guidelines](https://github.com/ZenYukti/.github/blob/main/CONTRIBUTING.md)**
+  * Join our [Discord Server](https://go.zenyukti.in/discord)
+  * Explore other **Open Issues**
+
+# When someone opens their first ever PR
+newPRWelcomeComment: >
+  ![ZenYukti Banner](https://github.com/ZenYukti/zenyukti.github.io/blob/main/public/assets/branding/Cheers_GitHub_Banner.png?raw=true)
+
+  ## Yay! You're officially a Contributor! 🎉
+
+  Huge thanks for opening this Pull Request. Being a contributor to **ZenYukti** is a big deal, and we’re excited to have you on board.
+
+  **Next Steps:**
+  1. A maintainer will review your code soon.
+  2. Please ensure you've linked an **assigned issue** in the description.
+  3. Stay tuned for feedback!
+
+# When their first PR is finally MERGED
+firstPRMergeComment: >
+  ## Mission Accomplished! 🏆
+
+  Congratulations on merging your first PR into ZenYukti! Your code is now officially part of the project. 
+
+  We appreciate your hard work and can't wait to see what you build next. Keep the momentum going!
