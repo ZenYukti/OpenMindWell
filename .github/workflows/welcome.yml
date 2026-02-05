@@ -1,35 +1,23 @@
-name: ZenYukti Welcome & Success Bot
+name: ZenYukti Welcome Bot
 on:
   workflow_dispatch:
-  pull_request_target:
-    types: [opened, closed]
   issues:
     types: [opened]
+  pull_request_target:
+    types: [opened]
 
-# Force permissions at the top level
 permissions:
   issues: write
   pull-requests: write
-  contents: read
 
 jobs:
-  welcome_test:
+  welcome:
     runs-on: ubuntu-latest
     steps:
-      - name: Post Comment
-        uses: actions/github-script@v7 # Updated to v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }} # Explicitly pass the token
-          script: |
-            const banner = `<picture>
-              <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ZenYukti/zenyukti.github.io/main/public/assets/branding/gh-dark.png">
-              <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/ZenYukti/zenyukti.github.io/main/public/assets/branding/gh-bright.png">
-              <img alt="ZenYukti Banner" src="https://raw.githubusercontent.com/ZenYukti/zenyukti.github.io/main/public/assets/branding/gh-bright.png" width="800">
-            </picture>`;
-            
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number || context.payload.issue.number || context.payload.pull_request.number,
-              body: `${banner}\n\n## ZenYukti Bot is Live! 🚀`
-            });
+      - name: Post Comment via Curl
+        run: |
+          curl -X POST \
+          -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.issue.number || github.event.pull_request.number }}/comments \
+          -d '{"body":"## Welcome to ZenYukti! 🚀\n\nIf you see this, the API bypass worked!"}'
