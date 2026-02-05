@@ -31,6 +31,11 @@ OpenMindWell is a **self-hosted, open-source** mental health support platform bu
 6. **Push**: `git push origin feature/your-feature`
 7. **Open Pull Request** on GitHub
 
+**Note:**
+```bash
+Please wait for maintainer confirmation or assignment before starting work on an issue. Pull requests opened without prior discussion or assignment may be closed if they do not align with the approved scope, technical approach, or current project priorities.
+```
+
 ### Commit Message Convention
 
 Use [Conventional Commits](https://www.conventionalcommits.org/):
