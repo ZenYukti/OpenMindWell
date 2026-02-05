@@ -115,21 +115,21 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl h-[80vh] flex flex-col">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl h-[80vh] flex flex-col">
         {/* Header */}
-        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">{room.name}</h2>
-            <p className="text-sm text-gray-600">{room.description}</p>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">{room.name}</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400">{room.description}</p>
           </div>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-              <span className="text-xs text-gray-600">{isConnected ? 'Connected' : 'Disconnected'}</span>
+              <span className="text-xs text-gray-600 dark:text-gray-400">{isConnected ? 'Connected' : 'Disconnected'}</span>
             </div>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none"
               aria-label="Close"
             >
               ×
@@ -139,7 +139,7 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
 
         {/* Crisis Alert Banner */}
         {showCrisisAlert && (
-          <div className="bg-red-50 border-l-4 border-red-500 p-4">
+          <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4">
             <div className="flex items-start">
               <div className="flex-shrink-0">
                 <svg className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
@@ -151,10 +151,10 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
                 </svg>
               </div>
               <div className="ml-3 flex-1">
-                <p className="text-sm font-medium text-red-800">
+                <p className="text-sm font-medium text-red-800 dark:text-red-200">
                   ⚠️ CRISIS DETECTED - Moderators have been notified
                 </p>
-                <p className="text-xs text-red-700 mt-1">
+                <p className="text-xs text-red-700 dark:text-red-300 mt-1">
                   🇺🇸 Call 988 | Text HOME to 741741 | 🇮🇳 Call 9152987821 (iCall) | KIRAN 1800-599-0019
                 </p>
               </div>
@@ -164,15 +164,15 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
 
         {/* Connection Error */}
         {connectionError && (
-          <div className="bg-yellow-50 border-l-4 border-yellow-500 p-3">
-            <p className="text-sm text-yellow-800">⚠️ {connectionError}</p>
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-500 p-3">
+            <p className="text-sm text-yellow-800 dark:text-yellow-300">⚠️ {connectionError}</p>
           </div>
         )}
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-900">
           {messages.length === 0 && (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
               <p>No messages yet. Start the conversation!</p>
             </div>
           )}
@@ -189,15 +189,15 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
               }`}
             >
               {msg.type === 'system' ? (
-                <div className="text-xs text-gray-500 italic">{msg.content}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 italic">{msg.content}</div>
               ) : (
                 <div
                   className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
                     msg.userId === currentUser.id
                       ? 'bg-primary-600 text-white'
                       : msg.riskLevel === 'high' || msg.riskLevel === 'critical'
-                      ? 'bg-red-100 border border-red-300'
-                      : 'bg-white border border-gray-200'
+                      ? 'bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700'
+                      : 'bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600'
                   }`}
                 >
                   <div className="flex items-center gap-2 mb-1">
@@ -206,8 +206,8 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
                         msg.userId === currentUser.id
                           ? 'text-primary-100'
                           : msg.riskLevel === 'high' || msg.riskLevel === 'critical'
-                          ? 'text-red-700'
-                          : 'text-gray-600'
+                          ? 'text-red-700 dark:text-red-300'
+                          : 'text-gray-600 dark:text-gray-300'
                       }`}
                     >
                       {msg.userId === currentUser.id ? 'You' : msg.nickname}
@@ -217,8 +217,8 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
                         msg.userId === currentUser.id
                           ? 'text-primary-200'
                           : msg.riskLevel === 'high' || msg.riskLevel === 'critical'
-                          ? 'text-red-500'
-                          : 'text-gray-400'
+                          ? 'text-red-500 dark:text-red-400'
+                          : 'text-gray-400 dark:text-gray-500'
                       }`}
                     >
                       {new Date(msg.timestamp).toLocaleTimeString([], {
@@ -232,14 +232,14 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
                       msg.userId === currentUser.id
                         ? 'text-white'
                         : msg.riskLevel === 'high' || msg.riskLevel === 'critical'
-                        ? 'text-red-900'
-                        : 'text-gray-800'
+                        ? 'text-red-900 dark:text-red-200'
+                        : 'text-gray-800 dark:text-gray-100'
                     }`}
                   >
                     {msg.content}
                   </p>
                   {(msg.riskLevel === 'high' || msg.riskLevel === 'critical') && (
-                    <div className="mt-1 text-xs text-red-600 font-medium">⚠️ Crisis language detected</div>
+                    <div className="mt-1 text-xs text-red-600 dark:text-red-400 font-medium">⚠️ Crisis language detected</div>
                   )}
                 </div>
               )}
@@ -249,7 +249,7 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
         </div>
 
         {/* Input */}
-        <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-200 bg-white">
+        <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
           <div className="flex gap-2">
             <input
               type="text"
@@ -257,7 +257,7 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
               onChange={(e) => setInputValue(e.target.value)}
               placeholder={isConnected ? 'Type your message...' : 'Connecting...'}
               disabled={!isConnected}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+              className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 dark:disabled:bg-gray-600 disabled:cursor-not-allowed"
               maxLength={500}
             />
             <button
@@ -268,7 +268,7 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
               Send
             </button>
           </div>
-          <p className="text-xs text-gray-500 mt-2">
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
             💡 Be kind and supportive. All messages are monitored for safety.
           </p>
         </form>
