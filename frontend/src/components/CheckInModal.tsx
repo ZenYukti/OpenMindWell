@@ -73,7 +73,7 @@ export default function CheckInModal({
                             <div className="confetti-container">
                                 {[...Array(50)].map((_, i) => (
                                     <div
-                                        key={i}
+                                        key={`confetti-${i}`}
                                         className="confetti-piece"
                                         style={{
                                             left: `${Math.random() * 100}%`,

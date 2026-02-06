@@ -97,16 +97,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12">
-        <div className="container mx-auto px-4 text-center">
-          <p className="mb-4">OpenMindWell is 100% free and open-source</p>
-          <p className="text-gray-400 text-sm">
-            Remember: Seeking professional help is a sign of strength, not weakness.
-          </p>
-        </div>
-      </footer>
-
       <Footer />
     </main>
   );
