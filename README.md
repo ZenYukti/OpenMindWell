@@ -81,10 +81,10 @@ This comprehensive guide contains:
        │ Supabase Auth                       ├──────────┐
        │ (Anonymous)                         │          │
        │                                     ▼          ▼
-       │                              ┌──────────┐ ┌──────────┐
+       │                              ┌──────────┐ ┌───────────┐
        └─────────────────────────────►│ SUPABASE │ │HuggingFace│
-                                      │(Database)│ │   (AI)   │
-                                      └──────────┘ └──────────┘
+                                      │(Database)│ │   (AI)    │
+                                      └──────────┘ └───────────┘
 ```
 
 **Key Interactions:**

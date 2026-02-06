@@ -10,7 +10,13 @@ permissions:
   pull-requests: write
   contents: read
 
+permissions:
+  issues: write
+  pull-requests: write
+  contents: read
+
 jobs:
+  zen_bot:
   zen_bot:
     runs-on: ubuntu-latest
     steps:
@@ -27,16 +33,17 @@ jobs:
             COUNT=$(curl -s -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/search/issues?q=author:$USER_LOGIN+repo:$REPO+type:issue" | jq '.total_count')
             if [ "$COUNT" -le 1 ]; then
               cat <<EOF > body.txt
-          $BANNER
-
           ## Welcome to the ZenYukti Community! 🚀
 
+          Thank you for opening your first issue! We believe every great project starts with a single conversation. Our team will review this shortly.
           Thank you for opening your first issue! We believe every great project starts with a single conversation. Our team will review this shortly.
 
           **While you wait, feel free to:**
           * Check our **[CONTRIBUTING Guidelines](https://github.com/ZenYukti/.github/blob/main/CONTRIBUTING.md)**
           * Join our [Discord Server](https://go.zenyukti.in/discord)
           * Explore other **Open Issues**
+
+          $BANNER
           EOF
             fi
 
@@ -45,16 +52,17 @@ jobs:
             COUNT=$(curl -s -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/search/issues?q=author:$USER_LOGIN+repo:$REPO+type:pr" | jq '.total_count')
             if [ "$COUNT" -le 1 ]; then
               cat <<EOF > body.txt
-          $BANNER
-
           ## Yay! You're officially a Contributor! 🎉
 
+          Huge thanks for opening this Pull Request. Being a contributor to **ZenYukti** is a big deal, and we’re excited to have you on board.
           Huge thanks for opening this Pull Request. Being a contributor to **ZenYukti** is a big deal, and we’re excited to have you on board.
 
           **Next Steps:**
           1. A maintainer will review your code soon.
           2. Please ensure you've linked an **assigned issue** in the description.
           3. Stay tuned for feedback!
+
+          $BANNER
           EOF
             fi
 
@@ -68,13 +76,14 @@ jobs:
           Congratulations on merging your first PR into ZenYukti! Your code is now officially part of the project. 
 
           We appreciate your hard work and can't wait to see what you build next. Keep the momentum going!
+
+          $BANNER
           EOF
             fi
           fi
 
           # --- SEND THE COMMENT ---
           if [ -f body.txt ]; then
-            # Use jq to safely convert the text file into a JSON string
             JSON_BODY=$(jq -Rs . < body.txt)
             
             curl -L -X POST \
