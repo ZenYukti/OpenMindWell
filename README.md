@@ -26,8 +26,8 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/openmindwell.git
-cd openmindwell
+git clone https://github.com/ZenYukti/OpenMindWell.git
+cd OpenMindWell
 
 # Install dependencies
 npm install
@@ -43,11 +43,11 @@ npm run dev
 
 Visit http://localhost:3000
 
-For deatailed guide, read [Contributing Guidelines](CONTRIBUTING.md) first.
+For detailed guide, read [Contributing Guidelines](CONTRIBUTING.md) first.
 
 ## Documentation
 
-**READ THIS FIRST:** [OPENMINDWELL_PROJECT_GUIDE.md](./OPENMINDWELL_PROJECT_GUIDE.md)
+**READ THIS FIRST:** [Project_Guide.md](./Project_Guide.md)
 
 This comprehensive guide contains:
 - Complete setup instructions
@@ -100,7 +100,7 @@ This comprehensive guide contains:
 openmindwell/
 ├── backend/           # Express API + WebSocket server
 ├── frontend/          # React + Vite application
-├── OPENMINDWELL_PROJECT_GUIDE.md
+├── Project_Guide.md
 ├── CONTRIBUTING.md
 └── package.json       # Monorepo scripts
 ```
