@@ -37,6 +37,8 @@ export default function EditHabitModal({ isOpen, habit, onClose, onUpdate }: Edi
             return;
         }
 
+        if (!habit) return;  // TypeScript null guard
+
         setLoading(true);
         setError('');
 

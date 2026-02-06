@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 
 interface CheckInModalProps {
     isOpen: boolean;
@@ -39,6 +39,7 @@ export default function CheckInModal({
     if (!isOpen || !habit) return null;
 
     async function handleCheckIn() {
+        if (!habit) return;  // TypeScript null guard
         setLoading(true);
 
         try {
