@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Open-source anonymous mental health support platform",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "cd backend && npm run dev",
@@ -10,7 +11,8 @@
     "build": "npm run build:backend && npm run build:frontend",
     "build:backend": "cd backend && npm run build",
     "build:frontend": "cd frontend && npm run build",
-    "preview": "cd frontend && npm run preview"
+    "preview": "cd frontend && npm run preview",
+     "setup": "node scripts/setup-env.js"
   },
   "keywords": [
     "mental-health",
@@ -23,5 +25,8 @@
   "license": "MIT",
   "devDependencies": {
     "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "inquirer": "^13.2.2"
   }
 }
