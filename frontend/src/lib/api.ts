@@ -29,19 +29,19 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
 // Journal API
 export const journalApi = {
   getAll: () => apiFetch('/api/journal'),
-  
+
   create: (entry: { title: string; content: string; mood?: number; tags?: string[] }) =>
     apiFetch('/api/journal', {
       method: 'POST',
       body: JSON.stringify(entry),
     }),
-  
+
   update: (id: string, entry: { title: string; content: string; mood?: number; tags?: string[] }) =>
     apiFetch(`/api/journal/${id}`, {
       method: 'PUT',
       body: JSON.stringify(entry),
     }),
-  
+
   delete: (id: string) =>
     apiFetch(`/api/journal/${id}`, {
       method: 'DELETE',
@@ -51,27 +51,29 @@ export const journalApi = {
 // Habits API
 export const habitsApi = {
   getAll: () => apiFetch('/api/habits'),
-  
+
+  getTodayLogs: () => apiFetch('/api/habits/today'),
+
   create: (habit: { name: string; description?: string; frequency?: 'daily' | 'weekly' }) =>
     apiFetch('/api/habits', {
       method: 'POST',
       body: JSON.stringify(habit),
     }),
-  
+
   log: (habitId: string, notes?: string) =>
     apiFetch(`/api/habits/${habitId}/log`, {
       method: 'POST',
       body: JSON.stringify({ notes }),
     }),
-  
+
   getLogs: (habitId: string) => apiFetch(`/api/habits/${habitId}/logs`),
-  
+
   update: (id: string, habit: { name: string; description?: string; frequency?: 'daily' | 'weekly' }) =>
     apiFetch(`/api/habits/${id}`, {
       method: 'PUT',
       body: JSON.stringify(habit),
     }),
-  
+
   delete: (id: string) =>
     apiFetch(`/api/habits/${id}`, {
       method: 'DELETE',
@@ -89,7 +91,7 @@ export const resourcesApi = {
 // Rooms API
 export const roomsApi = {
   getAll: () => apiFetch('/api/rooms'),
-  
+
   getMessages: (roomId: string, limit?: number) => {
     const query = limit ? `?limit=${limit}` : '';
     return apiFetch(`/api/rooms/${roomId}/messages${query}`);
@@ -99,12 +101,12 @@ export const roomsApi = {
 // Moderation API
 export const moderationApi = {
   getFlagged: () => apiFetch('/api/moderation/flagged'),
-  
+
   createReport: (messageId: string, reason: string) =>
     apiFetch('/api/moderation/reports', {
       method: 'POST',
       body: JSON.stringify({ messageId, reason }),
     }),
-  
+
   getReports: () => apiFetch('/api/moderation/reports'),
 };

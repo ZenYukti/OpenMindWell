@@ -4,12 +4,56 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
-// Get all habits for authenticated user
+// Helper function to calculate streak for a habit
+async function calculateStreak(habitId: string, userId: string): Promise<number> {
+  const { data: logs, error } = await supabase
+    .from('habit_logs')
+    .select('completed_at')
+    .eq('habit_id', habitId)
+    .eq('user_id', userId)
+    .order('completed_at', { ascending: false });
+
+  if (error || !logs || logs.length === 0) {
+    return 0;
+  }
+
+  // Get unique dates (in user's local date format)
+  const uniqueDates = [...new Set(
+    logs.map(log => new Date(log.completed_at).toISOString().split('T')[0])
+  )].sort().reverse();
+
+  if (uniqueDates.length === 0) return 0;
+
+  const today = new Date().toISOString().split('T')[0];
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+  // Streak must include today or yesterday
+  if (uniqueDates[0] !== today && uniqueDates[0] !== yesterday) {
+    return 0;
+  }
+
+  let streak = 1;
+  for (let i = 1; i < uniqueDates.length; i++) {
+    const currentDate = new Date(uniqueDates[i - 1]);
+    const prevDate = new Date(uniqueDates[i]);
+    const diffDays = (currentDate.getTime() - prevDate.getTime()) / 86400000;
+
+    if (diffDays === 1) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+
+  return streak;
+}
+
+// Get all habits for authenticated user with streaks
 router.get('/', authenticate, async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.id;
 
-    const { data, error } = await supabase
+    const { data: habits, error } = await supabase
       .from('habits')
       .select('*')
       .eq('user_id', userId)
@@ -20,7 +64,46 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
       return res.status(500).json({ error: 'Failed to fetch habits' });
     }
 
-    res.json(data || []);
+    // Calculate streaks for each habit
+    const habitsWithStreaks = await Promise.all(
+      (habits || []).map(async (habit) => {
+        const streak = await calculateStreak(habit.id, userId);
+        return { ...habit, current_streak: streak };
+      })
+    );
+
+    res.json(habitsWithStreaks);
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get today's logs for all habits (for checked-in status)
+router.get('/today', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const today = new Date().toISOString().split('T')[0];
+
+    const { data, error } = await supabase
+      .from('habit_logs')
+      .select('habit_id, completed_at, notes')
+      .eq('user_id', userId)
+      .gte('completed_at', `${today}T00:00:00.000Z`)
+      .lt('completed_at', `${today}T23:59:59.999Z`);
+
+    if (error) {
+      console.error('Error fetching today logs:', error);
+      return res.status(500).json({ error: 'Failed to fetch today logs' });
+    }
+
+    // Return as a map of habit_id -> log
+    const todayLogs: Record<string, any> = {};
+    (data || []).forEach(log => {
+      todayLogs[log.habit_id] = log;
+    });
+
+    res.json(todayLogs);
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -53,7 +136,8 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
       return res.status(500).json({ error: 'Failed to create habit' });
     }
 
-    res.status(201).json(data);
+    // Return with streak = 0 for new habit
+    res.status(201).json({ ...data, current_streak: 0 });
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -66,6 +150,21 @@ router.post('/:id/log', authenticate, async (req: AuthRequest, res) => {
     const userId = req.user!.id;
     const { id } = req.params;
     const { notes } = req.body;
+
+    // Check if already logged today
+    const today = new Date().toISOString().split('T')[0];
+    const { data: existingLog } = await supabase
+      .from('habit_logs')
+      .select('id')
+      .eq('habit_id', id)
+      .eq('user_id', userId)
+      .gte('completed_at', `${today}T00:00:00.000Z`)
+      .lt('completed_at', `${today}T23:59:59.999Z`)
+      .single();
+
+    if (existingLog) {
+      return res.status(400).json({ error: 'Already logged today' });
+    }
 
     const { data, error } = await supabase
       .from('habit_logs')
@@ -83,7 +182,9 @@ router.post('/:id/log', authenticate, async (req: AuthRequest, res) => {
       return res.status(500).json({ error: 'Failed to log habit' });
     }
 
-    res.status(201).json(data);
+    // Calculate and return new streak
+    const newStreak = await calculateStreak(id, userId);
+    res.status(201).json({ ...data, new_streak: newStreak });
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -143,7 +244,9 @@ router.put('/:id', authenticate, async (req: AuthRequest, res) => {
       return res.status(404).json({ error: 'Habit not found' });
     }
 
-    res.json(data);
+    // Return with current streak
+    const streak = await calculateStreak(id, userId);
+    res.json({ ...data, current_streak: streak });
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ error: 'Internal server error' });
