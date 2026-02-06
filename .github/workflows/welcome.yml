@@ -5,71 +5,55 @@ on:
   issues:
     types: [opened]
 
+permissions:
+  issues: write
+  pull-requests: write
+  contents: read
+
 jobs:
-  # JOB 1: Welcome for First Issue and First PR Opening
-  welcome_new_users:
-    if: github.event.action == 'opened'
+  zen_bot:
     runs-on: ubuntu-latest
     steps:
-      - name: First Interaction Welcome
-        uses: actions/first-interaction@v1
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          # MESSAGE FOR FIRST EVER ISSUE
-          issue-message: |
-            <picture>
-              <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ZenYukti/zenyukti.github.io/main/public/assets/branding/gh-dark.png">
-              <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/ZenYukti/zenyukti.github.io/main/public/assets/branding/gh-bright.png">
-              <img alt="ZenYukti Banner" src="https://raw.githubusercontent.com/ZenYukti/zenyukti.github.io/main/public/assets/branding/gh-bright.png" width="800">
-            </picture>
+      - name: ZenYukti Automation
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 1. Define the Adaptive Banner
+          BANNER='<picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ZenYukti/zenyukti.github.io/main/public/assets/branding/gh-dark.png"><source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/ZenYukti/zenyukti.github.io/main/public/assets/branding/gh-bright.png"><img alt="ZenYukti Banner" src="https://raw.githubusercontent.com/ZenYukti/zenyukti.github.io/main/public/assets/branding/gh-bright.png" width="800"></picture>'
+          
+          USER_LOGIN="${{ github.actor }}"
+          REPO="${{ github.repository }}"
 
-            ## Welcome to the ZenYukti Community! 🚀
+          # --- LOGIC FOR NEW ISSUE (FIRST TIME) ---
+          if [[ "${{ github.event_name }}" == "issues" && "${{ github.event.action }}" == "opened" ]]; then
+            # Check if user has other issues in this repo
+            COUNT=$(curl -s -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/search/issues?q=author:$USER_LOGIN+repo:$REPO+type:issue" | jq '.total_count')
+            if [ "$COUNT" -le 1 ]; then
+              BODY="$BANNER\n\n## Welcome to the ZenYukti Community! 🚀\n\nThank you for opening your first issue! We believe every great project starts with a single conversation.\n\n**While you wait:**\n* Check [CONTRIBUTING Guidelines](https://github.com/ZenYukti/.github/blob/main/CONTRIBUTING.md)\n* Join [Discord](https://go.zenyukti.in/discord)"
+            fi
 
-            Thank you for opening your first issue! We believe that every great project starts with a single conversation. Our team will review this shortly.
+          # --- LOGIC FOR NEW PR (FIRST TIME) ---
+          elif [[ "${{ github.event_name }}" == "pull_request_target" && "${{ github.event.action }}" == "opened" ]]; then
+            # Check if user has other PRs in this repo
+            COUNT=$(curl -s -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/search/issues?q=author:$USER_LOGIN+repo:$REPO+type:pr" | jq '.total_count')
+            if [ "$COUNT" -le 1 ]; then
+              BODY="$BANNER\n\n## Yay! You're officially a Contributor! 🎉\n\nHuge thanks for opening your first Pull Request. Being a contributor to ZenYukti is a big deal!\n\n**Next Steps:**\n1. Maintainers will review soon.\n2. Link an assigned issue in the description."
+            fi
 
-            **While you wait, feel free to:**
-            * Check our **[CONTRIBUTING Guidelines](https://github.com/ZenYukti/.github/blob/main/CONTRIBUTING.md)**
-            * Join our [Discord Server](https://go.zenyukti.in/discord)
-            * Explore other **Open Issues**
+          # --- LOGIC FOR FIRST PR MERGE ---
+          elif [[ "${{ github.event.pull_request.merged }}" == "true" ]]; then
+            # Check if this is their first merged PR
+            COUNT=$(curl -s -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/search/issues?q=author:$USER_LOGIN+repo:$REPO+type:pr+is:merged" | jq '.total_count')
+            if [ "$COUNT" -eq 1 ]; then
+              BODY="## Mission Accomplished! 🏆\n\nCongratulations on merging your first PR into ZenYukti! Your code is now officially part of the project. Keep the momentum going!"
+            fi
+          fi
 
-          # MESSAGE FOR FIRST EVER PR
-          pr-message: |
-            <picture>
-              <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ZenYukti/zenyukti.github.io/main/public/assets/branding/gh-dark.png">
-              <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/ZenYukti/zenyukti.github.io/main/public/assets/branding/gh-bright.png">
-              <img alt="ZenYukti Banner" src="https://raw.githubusercontent.com/ZenYukti/zenyukti.github.io/main/public/assets/branding/gh-bright.png" width="800">
-            </picture>
-
-            ## Yay! You're officially a Contributor! 🎉
-
-            Huge thanks for opening this Pull Request. Being a contributor to **ZenYukti** is a big deal, and we’re excited to have you on board.
-
-            **Next Steps:**
-            1. A maintainer will review your code soon.
-            2. Please ensure you've linked an **assigned issue** in the description.
-            3. Stay tuned for feedback!
-
-  # JOB 2: Celebrate ONLY when the First PR is Merged
-  celebrate_merge:
-    if: github.event.pull_request.merged == true
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check if first-time contributor
-        id: check_first
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const { owner, repo } = context.repo;
-            const author = context.payload.pull_request.user.login;
-            const res = await github.rest.search.issuesAndPullRequests({
-              q: `is:pr is:merged author:${author} repo:${owner}/${repo}`
-            });
-            // If this is the only merged PR, it's their first!
-            if (res.data.total_count === 1) {
-              await github.rest.issues.createComment({
-                owner,
-                repo,
-                issue_number: context.issue.number,
-                body: `## Mission Accomplished! 🏆\n\nCongratulations on merging your first PR into ZenYukti! Your code is now officially part of the project.\n\nWe appreciate your hard work and can't wait to see what you build next. Keep the momentum going!`
-              });
-            }
+          # --- POST THE COMMENT IF BODY IS SET ---
+          if [ ! -z "$BODY" ]; then
+            curl -L -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            https://api.github.com/repos/$REPO/issues/${{ github.event.issue.number || github.event.pull_request.number }}/comments \
+            -d "{\"body\":\"$BODY\"}"
+          fi
