@@ -21,17 +21,17 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-50 dark:from-gray-900 to-white dark:to-gray-800">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <p className="mt-4 text-gray-600 dark:text-gray-300">Loading...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
+    <main className="min-h-screen bg-gradient-to-b from-blue-50 dark:from-gray-900 to-white dark:to-gray-800">
       {/* Crisis Banner */}
       <div className="bg-red-600 text-white py-3 px-4 text-center text-sm">
         <strong>⚠️ IN CRISIS?</strong> 🇺🇸 Call 988 | Text HOME to 741741 | 🇮🇳 Call 9152987821 (iCall) | KIRAN 1800-599-0019 | Visit findahelpline.com
@@ -39,17 +39,17 @@ export default function Home() {
 
       {/* Hero Section */}
       <div className="container mx-auto px-4 py-16 text-center">
-        <h1 className="text-5xl font-bold text-gray-900 mb-6">
-          Welcome to <span className="text-primary-600">OpenMindWell</span> 🌱
+        <h1 className="text-5xl font-bold text-gray-900 dark:text-white mb-6">
+          Welcome to <span className="text-primary-600 dark:text-primary-400">OpenMindWell</span> 🌱
         </h1>
-        <p className="text-xl text-gray-700 max-w-2xl mx-auto mb-8">
+        <p className="text-xl text-gray-700 dark:text-gray-300 max-w-2xl mx-auto mb-8">
           A safe, anonymous space for mental health peer support. Chat, journal, track habits, and find resources.
         </p>
 
         {/* Disclaimer */}
-        <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-6 max-w-3xl mx-auto mb-8">
-          <h3 className="font-bold text-yellow-900 mb-2">⚠️ Important Disclaimer</h3>
-          <p className="text-sm text-yellow-800">
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-400 dark:border-yellow-600 rounded-lg p-6 max-w-3xl mx-auto mb-8">
+          <h3 className="font-bold text-yellow-900 dark:text-yellow-200 mb-2">⚠️ Important Disclaimer</h3>
+          <p className="text-sm text-yellow-800 dark:text-yellow-300">
             OpenMindWell is NOT a substitute for professional mental health care. This platform provides peer support only.
             If you are experiencing a mental health crisis, please contact emergency services or a crisis hotline immediately.
           </p>
@@ -62,7 +62,7 @@ export default function Home() {
 
       {/* Features */}
       <div className="container mx-auto px-4 py-16">
-        <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">What We Offer</h2>
+        <h2 className="text-3xl font-bold text-center text-gray-900 dark:text-white mb-12">What We Offer</h2>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
           <FeatureCard
             emoji="💬"
@@ -114,10 +114,10 @@ export default function Home() {
 
 function FeatureCard({ emoji, title, description }: { emoji: string; title: string; description: string }) {
   return (
-    <div className="card text-center">
+    <div className="card text-center bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow">
       <div className="text-4xl mb-4">{emoji}</div>
-      <h3 className="text-xl font-semibold mb-2">{title}</h3>
-      <p className="text-gray-600">{description}</p>
+      <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white">{title}</h3>
+      <p className="text-gray-600 dark:text-gray-300">{description}</p>
     </div>
   );
 }

@@ -55,7 +55,7 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gradient-to-b from-blue-50 dark:from-gray-900 to-white dark:to-gray-800 flex items-center justify-center px-4">
       <div className="max-w-md w-full">
         {/* Crisis Banner */}
         <div className="bg-red-600 text-white py-2 px-4 rounded-lg text-center text-sm mb-6">
@@ -63,10 +63,10 @@ export default function Onboarding() {
         </div>
 
         <div className="card">
-          <h1 className="text-3xl font-bold text-center mb-6">Create Your Profile</h1>
+          <h1 className="text-3xl font-bold text-center mb-6 dark:text-white">Create Your Profile</h1>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <p className="text-sm text-blue-900">
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4 mb-6">
+            <p className="text-sm text-blue-900 dark:text-blue-200">
               <strong>🔒 Your privacy matters:</strong> We don't collect personal information.
               Choose a nickname and avatar to get started.
             </p>
@@ -75,7 +75,7 @@ export default function Onboarding() {
           <form onSubmit={handleSubmit}>
             {/* Nickname Input */}
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Choose a Nickname
               </label>
               <input
@@ -87,12 +87,12 @@ export default function Onboarding() {
                 maxLength={20}
                 disabled={loading}
               />
-              <p className="text-xs text-gray-500 mt-1">3-20 characters, no personal info</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">3-20 characters, no personal info</p>
             </div>
 
             {/* Avatar Selection */}
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Choose an Avatar
               </label>
               <div className="grid grid-cols-5 gap-2">
@@ -103,8 +103,8 @@ export default function Onboarding() {
                     onClick={() => setSelectedAvatar(avatar)}
                     className={`text-4xl p-3 rounded-lg border-2 transition-all ${
                       selectedAvatar === avatar
-                        ? 'border-primary-600 bg-primary-50 scale-110'
-                        : 'border-gray-300 hover:border-primary-400'
+                        ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/20 scale-110'
+                        : 'border-gray-300 dark:border-gray-600 hover:border-primary-400'
                     }`}
                     disabled={loading}
                   >
@@ -116,7 +116,7 @@ export default function Onboarding() {
 
             {/* Error Message */}
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg mb-4">
                 {error}
               </div>
             )}
@@ -131,8 +131,8 @@ export default function Onboarding() {
             </button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <p className="text-xs text-gray-600 text-center">
+          <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+            <p className="text-xs text-gray-600 dark:text-gray-400 text-center">
               By continuing, you acknowledge that OpenMindWell is not a substitute for professional mental health care.
             </p>
           </div>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getSession, getCurrentUser, getProfile, signOut } from '../lib/supabase';
 import { roomsApi, resourcesApi } from '../lib/api';
 import ChatRoom from '../components/ChatRoom';
+import ThemeToggle from '../components/ThemeToggle';
 
 type Tab = 'rooms' | 'journal' | 'habits' | 'resources';
 
@@ -39,40 +40,43 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <p className="mt-4 text-gray-600 dark:text-gray-300">Loading...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Crisis Banner */}
       <div className="bg-red-600 text-white py-2 px-4 text-center text-xs">
         ⚠️ IN CRISIS? 🇺🇸 988 | 🇮🇳 9152987821 (iCall) | KIRAN 1800-599-0019
       </div>
 
       {/* Header */}
-      <header className="bg-white shadow-sm">
+      <header className="bg-white dark:bg-gray-800 shadow-sm">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="text-3xl">{profile?.avatar || '😊'}</div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900">{profile?.nickname || 'User'}</h1>
-              <p className="text-sm text-gray-500">OpenMindWell by ZenYukti</p>
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white">{profile?.nickname || 'User'}</h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400">OpenMindWell by ZenYukti</p>
             </div>
           </div>
-          <button onClick={handleSignOut} className="text-sm text-gray-600 hover:text-gray-900">
-            Sign Out
-          </button>
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            <button onClick={handleSignOut} className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white">
+              Sign Out
+            </button>
+          </div>
         </div>
       </header>
 
       {/* Tabs */}
-      <div className="bg-white border-b border-gray-200">
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="container mx-auto px-4">
           <nav className="flex gap-8">
             <TabButton active={activeTab === 'rooms'} onClick={() => setActiveTab('rooms')}>
@@ -108,8 +112,8 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
       onClick={onClick}
       className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors ${
         active
-          ? 'border-primary-600 text-primary-600'
-          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+          ? 'border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-300'
+          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-300 dark:hover:text-gray-200 dark:hover:border-gray-600'
       }`}
     >
       {children}
@@ -164,20 +168,20 @@ function RoomsTab() {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-6 text-gray-900">Support Rooms</h2>
+      <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Support Rooms</h2>
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
         {rooms.map((room) => (
           <div key={room.id} className="card hover:shadow-lg transition-shadow">
             <div className="flex items-start gap-3 mb-3">
-              <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <span className="text-primary-600 text-lg">💬</span>
+              <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center flex-shrink-0">
+                <span className="text-primary-600 dark:text-primary-400 text-lg">💬</span>
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-semibold mb-1">{room.name}</h3>
-                <p className="text-xs text-gray-500">{room.member_count || 0} members online</p>
+                <h3 className="text-lg font-semibold mb-1 dark:text-white">{room.name}</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{room.member_count || 0} members online</p>
               </div>
             </div>
-            <p className="text-sm text-gray-600 mb-4">{room.description}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">{room.description}</p>
             <button
               onClick={() => handleJoinRoom(room)}
               className="btn-primary w-full text-sm"
@@ -197,8 +201,8 @@ function RoomsTab() {
         />
       )}
 
-      <div className="mt-6 bg-green-50 border border-green-200 rounded-lg p-4">
-        <p className="text-sm text-green-900">
+      <div className="mt-6 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+        <p className="text-sm text-green-900 dark:text-green-200">
           ✅ <strong>Real-time chat is now active!</strong> Join a room to connect with others anonymously.
         </p>
       </div>
@@ -210,15 +214,15 @@ function JournalTab() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">My Journal</h2>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">My Journal</h2>
         <button className="btn-primary">+ New Entry</button>
       </div>
 
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
-        <p className="text-yellow-900">
+      <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6 text-center">
+        <p className="text-yellow-900 dark:text-yellow-200">
           📝 <strong>Journal feature coming soon!</strong> Track your thoughts, moods, and reflections.
         </p>
-        <p className="text-sm text-yellow-800 mt-2">
+        <p className="text-sm text-yellow-800 dark:text-yellow-300 mt-2">
           All journal entries are completely private and only visible to you.
         </p>
       </div>
@@ -230,15 +234,15 @@ function HabitsTab() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">My Habits</h2>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">My Habits</h2>
         <button className="btn-primary">+ New Habit</button>
       </div>
 
-      <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
-        <p className="text-green-900">
+      <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-6 text-center">
+        <p className="text-green-900 dark:text-green-200">
           ✅ <strong>Habit tracking coming soon!</strong> Build positive daily routines.
         </p>
-        <p className="text-sm text-green-800 mt-2">
+        <p className="text-sm text-green-800 dark:text-green-300 mt-2">
           Track streaks, log completions, and celebrate your progress.
         </p>
       </div>
@@ -273,7 +277,7 @@ function ResourcesTab() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Mental Health Resources</h2>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Mental Health Resources</h2>
         <select
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
@@ -291,18 +295,18 @@ function ResourcesTab() {
         {resources.map((resource) => (
           <div key={resource.id} className="card">
             <div className="flex items-start justify-between mb-2">
-              <h3 className="text-lg font-semibold">{resource.title}</h3>
-              <span className="text-xs bg-primary-100 text-primary-700 px-2 py-1 rounded">
+              <h3 className="text-lg font-semibold dark:text-white">{resource.title}</h3>
+              <span className="text-xs bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 px-2 py-1 rounded">
                 {resource.category}
               </span>
             </div>
-            <p className="text-sm text-gray-600 mb-4">{resource.description}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">{resource.description}</p>
             {resource.url && (
               <a
                 href={resource.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-primary-600 hover:text-primary-700 text-sm font-medium"
+                className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 text-sm font-medium"
               >
                 Learn More →
               </a>
@@ -312,7 +316,7 @@ function ResourcesTab() {
       </div>
 
       {resources.length === 0 && (
-        <div className="text-center py-12 text-gray-500">
+        <div className="text-center py-12 text-gray-500 dark:text-gray-400">
           No resources found in this category.
         </div>
       )}
