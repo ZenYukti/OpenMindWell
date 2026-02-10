@@ -1,8 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getSession, getCurrentUser, getProfile, signOut } from '../lib/supabase';
-import { roomsApi, resourcesApi } from '../lib/api';
+import { roomsApi, resourcesApi, habitsApi } from '../lib/api';
 import ChatRoom from '../components/ChatRoom';
+import HabitCard from '../components/HabitCard';
+import CreateHabitModal from '../components/CreateHabitModal';
+import EditHabitModal from '../components/EditHabitModal';
+import CheckInModal from '../components/CheckInModal';
+import DeleteConfirmModal from '../components/DeleteConfirmModal';
 
 type Tab = 'rooms' | 'journal' | 'habits' | 'resources';
 
@@ -106,11 +111,10 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
   return (
     <button
       onClick={onClick}
-      className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors ${
-        active
-          ? 'border-primary-600 text-primary-600'
-          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-      }`}
+      className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors ${active
+        ? 'border-primary-600 text-primary-600'
+        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+        }`}
     >
       {children}
     </button>
@@ -227,21 +231,141 @@ function JournalTab() {
 }
 
 function HabitsTab() {
+  const [habits, setHabits] = useState<any[]>([]);
+  const [todayLogs, setTodayLogs] = useState<Record<string, any>>({});
+  const [loading, setLoading] = useState(true);
+
+  // Modal states
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingHabit, setEditingHabit] = useState<any | null>(null);
+  const [checkingInHabit, setCheckingInHabit] = useState<any | null>(null);
+  const [deletingHabit, setDeletingHabit] = useState<any | null>(null);
+
+  useEffect(() => {
+    loadHabits();
+  }, []);
+
+  async function loadHabits() {
+    try {
+      const [habitsData, logsData] = await Promise.all([
+        habitsApi.getAll(),
+        habitsApi.getTodayLogs(),
+      ]);
+      setHabits(habitsData);
+      setTodayLogs(logsData);
+    } catch (error) {
+      console.error('Error loading habits:', error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleCreateHabit(habit: { name: string; description?: string; frequency: 'daily' | 'weekly' }) {
+    const newHabit = await habitsApi.create(habit);
+    setHabits([newHabit, ...habits]);
+  }
+
+  async function handleUpdateHabit(id: string, habit: { name: string; description?: string; frequency: 'daily' | 'weekly' }) {
+    const updatedHabit = await habitsApi.update(id, habit);
+    setHabits(habits.map(h => h.id === id ? updatedHabit : h));
+  }
+
+  async function handleCheckIn(habitId: string, notes?: string) {
+    const result = await habitsApi.log(habitId, notes);
+    // Update today's logs
+    setTodayLogs({ ...todayLogs, [habitId]: result });
+    // Update streak in habits list
+    setHabits(habits.map(h =>
+      h.id === habitId ? { ...h, current_streak: result.new_streak } : h
+    ));
+  }
+
+  async function handleDeleteHabit() {
+    if (!deletingHabit) return;
+    await habitsApi.delete(deletingHabit.id);
+    setHabits(habits.filter(h => h.id !== deletingHabit.id));
+    setDeletingHabit(null);
+  }
+
+  if (loading) {
+    return <div className="text-center py-8">Loading habits...</div>;
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-bold text-gray-900">My Habits</h2>
-        <button className="btn-primary">+ New Habit</button>
+        <button
+          className="btn-primary"
+          onClick={() => setShowCreateModal(true)}
+        >
+          + New Habit
+        </button>
       </div>
 
-      <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
-        <p className="text-green-900">
-          ✅ <strong>Habit tracking coming soon!</strong> Build positive daily routines.
-        </p>
-        <p className="text-sm text-green-800 mt-2">
-          Track streaks, log completions, and celebrate your progress.
-        </p>
-      </div>
+      {habits.length === 0 ? (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-8 text-center">
+          <div className="text-4xl mb-4">✨</div>
+          <h3 className="text-lg font-semibold text-green-900 mb-2">
+            Start Building Positive Habits
+          </h3>
+          <p className="text-green-700 mb-4">
+            Track daily routines, build streaks, and celebrate your progress.
+          </p>
+          <button
+            className="btn-primary"
+            onClick={() => setShowCreateModal(true)}
+          >
+            Create Your First Habit
+          </button>
+        </div>
+      ) : (
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {habits.map((habit) => (
+            <HabitCard
+              key={habit.id}
+              habit={habit}
+              streak={habit.current_streak || 0}
+              isCheckedInToday={!!todayLogs[habit.id]}
+              onCheckIn={() => setCheckingInHabit(habit)}
+              onEdit={() => setEditingHabit(habit)}
+              onDelete={() => setDeletingHabit(habit)}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Create Habit Modal */}
+      <CreateHabitModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onCreate={handleCreateHabit}
+      />
+
+      {/* Edit Habit Modal */}
+      <EditHabitModal
+        isOpen={!!editingHabit}
+        habit={editingHabit}
+        onClose={() => setEditingHabit(null)}
+        onUpdate={handleUpdateHabit}
+      />
+
+      {/* Check-in Modal */}
+      <CheckInModal
+        isOpen={!!checkingInHabit}
+        habit={checkingInHabit}
+        currentStreak={checkingInHabit?.current_streak || 0}
+        onClose={() => setCheckingInHabit(null)}
+        onCheckIn={handleCheckIn}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={!!deletingHabit}
+        habitName={deletingHabit?.name || ''}
+        onClose={() => setDeletingHabit(null)}
+        onConfirm={handleDeleteHabit}
+      />
     </div>
   );
 }
