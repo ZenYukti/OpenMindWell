@@ -95,7 +95,7 @@ export default function Onboarding() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Choose an Avatar
               </label>
-              <div className="grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 gap-2">
                 {AVATAR_OPTIONS.map((avatar) => (
                   <button
                     key={avatar}
