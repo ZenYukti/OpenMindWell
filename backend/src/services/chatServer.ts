@@ -1,6 +1,6 @@
 import WebSocket from 'ws';
 import { supabase } from '../lib/supabase';
-import { updateRoomCount } from '../lib/roomState';
+import { updateRoomCount } from '../lib/roomState'; // <--- IMPORT THIS
 
 interface ChatMessage {
   type: 'join' | 'leave' | 'chat' | 'crisis_alert' | 'typing' | 'online_count';
@@ -223,13 +223,13 @@ export class ChatServer {
   private handleDisconnect(ws: WebSocket) {
     const roomId = (ws as any).roomId;
     
-    // FIX: Robust disconnect handling
+    // FIX: Robust disconnect handling using Socket Reference
     if (roomId) {
       const room = this.rooms.get(roomId);
       if (room) {
         let nickname = '';
         
-        // Remove THIS specific socket
+        // Remove THIS specific socket (more accurate than userId)
         for (const member of room) {
           if (member.ws === ws) {
             nickname = member.nickname;

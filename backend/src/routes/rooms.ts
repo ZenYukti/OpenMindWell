@@ -31,6 +31,7 @@ router.get('/:roomId/activity', authenticate, async (req: AuthRequest, res) => {
     const { roomId } = req.params;
     
     // FIX: Read from shared memory, NOT database
+    // This gives the INSTANT count of connected sockets
     const liveCount = getRoomCount(roomId);
     
     res.json({ count: liveCount });
