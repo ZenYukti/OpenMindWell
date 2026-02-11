@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { supabase } from '../lib/supabase';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { getRoomCount } from '../lib/roomState'; // <--- MUST IMPORT THIS
 
 const router = Router();
 
@@ -24,13 +25,27 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
   }
 });
 
+// Get LIVE activity count (Reads from memory)
+router.get('/:roomId/activity', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const { roomId } = req.params;
+    
+    // FIX: Read from shared memory, NOT database
+    const liveCount = getRoomCount(roomId);
+    
+    res.json({ count: liveCount });
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Get messages for a room
 router.get('/:roomId/messages', authenticate, async (req: AuthRequest, res) => {
   try {
     const { roomId } = req.params;
     const limit = parseInt(req.query.limit as string) || 50;
 
-    // Fetch messages without joining profiles (will get user data from WebSocket)
     const { data, error } = await supabase
       .from('messages')
       .select('*')
