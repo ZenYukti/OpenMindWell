@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 
 interface ChatMessage {
-  type: 'join' | 'leave' | 'chat' | 'crisis_alert' | 'history' | 'error';
+  type: 'join' | 'leave' | 'chat' | 'crisis_alert' | 'history' | 'error' | 'typing';
   roomId?: string;
   userId?: string;
   nickname?: string;
@@ -10,6 +10,7 @@ interface ChatMessage {
   timestamp?: string;
   messages?: any[];
   message?: string;
+  isTyping?: boolean;
 }
 
 interface UseWebSocketOptions {
@@ -164,6 +165,19 @@ export function useWebSocket({
     isConnected,
     connectionError,
     sendMessage,
+    sendTyping: (isTyping: boolean) => {
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(
+          JSON.stringify({
+            type: 'typing',
+            roomId,
+            userId,
+            nickname,
+            content: isTyping ? 'true' : 'false',
+          })
+        );
+      }
+    },
     reconnect: connect,
     disconnect,
   };

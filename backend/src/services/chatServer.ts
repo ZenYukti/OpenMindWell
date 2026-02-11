@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { detectCrisis, getCrisisResourcesMessage } from './crisisDetection';
 
 interface ChatMessage {
-  type: 'join' | 'leave' | 'chat' | 'crisis_alert';
+  type: 'join' | 'leave' | 'chat' | 'crisis_alert' | 'typing';
   roomId?: string;
   userId?: string;
   nickname?: string;
@@ -79,8 +79,27 @@ export class ChatServer {
       case 'chat':
         await this.handleChatMessage(ws, message);
         break;
+      case 'typing':
+        this.handleTyping(ws, message);
+        break;
       default:
         ws.send(JSON.stringify({ type: 'error', message: 'Unknown message type' }));
+    }
+  }
+
+  private handleTyping(ws: WebSocket, message: ChatMessage) {
+    const roomId = (ws as any).roomId;
+    const userId = (ws as any).userId;
+    const nickname = (ws as any).nickname;
+
+    if (roomId && userId) {
+      // Broadcast to other users in the room
+      this.broadcastToRoom(roomId, {
+        type: 'typing',
+        userId,
+        nickname,
+        isTyping: message.content === 'true', // Use content field to convey on/off state if needed, or just presence of event
+      }, userId); // Exclude sender
     }
   }
 
@@ -256,13 +275,13 @@ export class ChatServer {
     console.log('WebSocket disconnected');
   }
 
-  private broadcastToRoom(roomId: string, message: any) {
+  private broadcastToRoom(roomId: string, message: any, excludeUserId?: string) {
     const room = this.rooms.get(roomId);
     if (!room) return;
 
     const messageStr = JSON.stringify(message);
     room.forEach((member) => {
-      if (member.ws.readyState === WebSocket.OPEN) {
+      if (member.userId !== excludeUserId && member.ws.readyState === WebSocket.OPEN) {
         member.ws.send(messageStr);
       }
     });
