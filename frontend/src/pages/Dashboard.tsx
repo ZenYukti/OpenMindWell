@@ -4,6 +4,9 @@ import { getSession, getCurrentUser, getProfile, signOut } from '../lib/supabase
 import { roomsApi, resourcesApi } from '../lib/api';
 import ChatRoom from '../components/ChatRoom';
 
+// Define the API URL from environment variables
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+
 type Tab = 'rooms' | 'journal' | 'habits' | 'resources';
 
 export default function Dashboard() {
@@ -117,6 +120,9 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
   );
 }
 
+// ----------------------------------------------------------------------
+// ROOMS TAB COMPONENT (Auto-Updates)
+// ----------------------------------------------------------------------
 function RoomsTab() {
   const [rooms, setRooms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -124,18 +130,61 @@ function RoomsTab() {
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
-    loadRooms();
+    // 1. Initial Load
+    loadRoomsAndCounts();
     loadCurrentUser();
+
+    // 2. Poll for updates every 3 seconds
+    const interval = setInterval(() => {
+        loadRoomsAndCounts(false); // false = don't show loading spinner on updates
+    }, 3000);
+
+    // Cleanup interval on unmount
+    return () => clearInterval(interval);
   }, []);
 
-  async function loadRooms() {
+  // Modified to optionally skip the loading spinner
+  async function loadRoomsAndCounts(showLoading = true) {
     try {
-      const data = await roomsApi.getAll();
-      setRooms(data);
+      if (showLoading) setLoading(true);
+      
+      const roomData = await roomsApi.getAll();
+      const session = await getSession();
+      const token = session?.access_token;
+
+      if (!token) {
+          setRooms(roomData);
+          if (showLoading) setLoading(false);
+          return;
+      }
+
+      const roomsWithCounts = await Promise.all(
+        roomData.map(async (room: any) => {
+          try {
+            const res = await fetch(`${API_URL}/api/rooms/${room.id}/activity`, {
+                headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (res.ok) {
+                const countData = await res.json();
+                return { ...room, active_count: countData.count };
+            } else {
+                return { ...room, active_count: 0 };
+            }
+          } catch (err) {
+            return { ...room, active_count: 0 };
+          }
+        })
+      );
+
+      setRooms(roomsWithCounts);
     } catch (error) {
       console.error('Error loading rooms:', error);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   }
 
@@ -174,7 +223,17 @@ function RoomsTab() {
               </div>
               <div className="flex-1">
                 <h3 className="text-lg font-semibold mb-1">{room.name}</h3>
-                <p className="text-xs text-gray-500">{room.member_count || 0} members online</p>
+                
+                <div className="flex items-center gap-2 mt-1">
+                    <span className={`relative flex h-2 w-2`}>
+                      <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${room.active_count > 0 ? 'bg-green-400' : 'bg-gray-400'}`}></span>
+                      <span className={`relative inline-flex rounded-full h-2 w-2 ${room.active_count > 0 ? 'bg-green-500' : 'bg-gray-400'}`}></span>
+                    </span>
+                    <p className="text-xs font-medium text-gray-600">
+                        {room.active_count || 0} members online
+                    </p>
+                </div>
+
               </div>
             </div>
             <p className="text-sm text-gray-600 mb-4">{room.description}</p>
@@ -188,12 +247,15 @@ function RoomsTab() {
         ))}
       </div>
 
-      {/* Chat Room Modal */}
       {selectedRoom && currentUser && (
         <ChatRoom
           room={selectedRoom}
           currentUser={currentUser}
-          onClose={() => setSelectedRoom(null)}
+          onClose={() => {
+              setSelectedRoom(null);
+              // Immediate refresh when closing
+              loadRoomsAndCounts(false);
+          }}
         />
       )}
 

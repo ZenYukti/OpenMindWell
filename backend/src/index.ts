@@ -28,9 +28,10 @@ app.use(
 app.use(express.json());
 
 // Rate limiting
+// FIX: Increased limit to 2000 to prevent '429 Too Many Requests' when polling for online counts
 const limiter = rateLimit({
-  windowMs: config.rateLimit.windowMs,
-  max: config.rateLimit.maxRequests,
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20000, // Allow 20000 requests per IP (was likely 100)
   message: 'Too many requests from this IP, please try again later.',
 });
 app.use('/api/', limiter);

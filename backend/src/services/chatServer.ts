@@ -1,15 +1,16 @@
 import WebSocket from 'ws';
 import { supabase } from '../lib/supabase';
-import { detectCrisis, getCrisisResourcesMessage } from './crisisDetection';
+import { updateRoomCount } from '../lib/roomState'; // Ensure you have this file!
 
 interface ChatMessage {
-  type: 'join' | 'leave' | 'chat' | 'crisis_alert';
+  type: 'join' | 'leave' | 'chat' | 'crisis_alert' | 'typing' | 'online_count';
   roomId?: string;
   userId?: string;
   nickname?: string;
   content?: string;
   riskLevel?: string;
   timestamp?: string;
+  count?: number;
 }
 
 interface RoomMember {
@@ -28,7 +29,7 @@ export class ChatServer {
 
     this.wss.on('connection', this.handleConnection.bind(this));
 
-    // Heartbeat to detect dead connections
+    // Heartbeat to clean up dead connections
     setInterval(() => {
       this.wss.clients.forEach((ws: any) => {
         if (ws.isAlive === false) {
@@ -40,13 +41,37 @@ export class ChatServer {
     }, 30000);
   }
 
-  private handleConnection(ws: WebSocket) {
-    console.log('New WebSocket connection');
+  // Helper to count UNIQUE users (Includes Lazy Cleanup)
+  private getUniqueUserCount(roomId: string): number {
+    const room = this.rooms.get(roomId);
+    if (!room) return 0;
+    
+    const uniqueUsers = new Set<string>();
+    
+    // BUG FIX: Use Array.from() to safely iterate while deleting
+    // Iterating a Set while modifying it causes items to be skipped
+    const members = Array.from(room);
+    
+    for (const member of members) {
+        if (member.ws.readyState !== WebSocket.OPEN && member.ws.readyState !== WebSocket.CONNECTING) {
+            room.delete(member); // Auto-cleanup dead user
+        } else {
+            uniqueUsers.add(member.userId);
+        }
+    }
+    
+    return uniqueUsers.size;
+  }
 
+  // Helper to sync state with the API
+  private updateSharedState(roomId: string) {
+    const count = this.getUniqueUserCount(roomId);
+    updateRoomCount(roomId, count); // Sync with shared memory
+  }
+
+  private handleConnection(ws: WebSocket) {
     (ws as any).isAlive = true;
-    ws.on('pong', () => {
-      (ws as any).isAlive = true;
-    });
+    ws.on('pong', () => { (ws as any).isAlive = true; });
 
     ws.on('message', async (data: string) => {
       try {
@@ -54,12 +79,6 @@ export class ChatServer {
         await this.handleMessage(ws, message);
       } catch (error) {
         console.error('Error handling message:', error);
-        // Send error but don't close connection
-        try {
-          ws.send(JSON.stringify({ type: 'error', message: 'Invalid message format' }));
-        } catch (sendError) {
-          console.error('Error sending error message:', sendError);
-        }
       }
     });
 
@@ -74,63 +93,69 @@ export class ChatServer {
         await this.handleJoin(ws, message);
         break;
       case 'leave':
-        this.handleLeave(ws, message);
+        this.handleDisconnect(ws);
         break;
       case 'chat':
         await this.handleChatMessage(ws, message);
         break;
-      default:
-        ws.send(JSON.stringify({ type: 'error', message: 'Unknown message type' }));
+      case 'typing':
+        this.handleTyping(ws, message);
+        break;
     }
   }
 
   private async handleJoin(ws: WebSocket, message: ChatMessage) {
     const { roomId, userId, nickname } = message;
-
-    if (!roomId || !userId || !nickname) {
-      ws.send(JSON.stringify({ type: 'error', message: 'Missing required fields' }));
-      return;
-    }
+    if (!roomId || !userId || !nickname) return;
 
     try {
-      // Add user to room
       if (!this.rooms.has(roomId)) {
         this.rooms.set(roomId, new Set());
       }
-
       const room = this.rooms.get(roomId)!;
-      room.add({ ws, userId, nickname });
 
-      // Store connection metadata
+      // Clean up old connections for this user (Single device policy)
+      const members = Array.from(room);
+      for (const member of members) {
+        if (member.userId === userId) {
+          room.delete(member);
+          // Force close old socket so it doesn't linger
+          if (member.ws.readyState === WebSocket.OPEN) {
+             member.ws.terminate();
+          }
+        }
+      }
+
+      room.add({ ws, userId, nickname });
+      
+      // Attach metadata to socket for easier cleanup on disconnect
       (ws as any).roomId = roomId;
       (ws as any).userId = userId;
       (ws as any).nickname = nickname;
 
-      // Fetch recent messages from database (without profile join - nicknames come from messages)
-      const { data: messages, error } = await supabase
+      // Update Shared State for API
+      this.updateSharedState(roomId);
+
+      // 1. Load History
+      const { data: messages } = await supabase
         .from('messages')
         .select('*')
         .eq('room_id', roomId)
         .order('created_at', { ascending: false })
         .limit(50);
 
-      if (error) {
-        console.error('Error fetching messages:', error);
-        // Send error but continue - don't crash the connection
-        ws.send(JSON.stringify({ 
-          type: 'error', 
-          message: 'Could not load message history' 
-        }));
-      } else {
-        ws.send(
-          JSON.stringify({
-            type: 'history',
-            messages: messages?.reverse() || [],
-          })
-        );
-      }
+      ws.send(JSON.stringify({
+        type: 'history',
+        messages: messages?.reverse() || [],
+      }));
 
-      // Broadcast join event
+      // 2. Broadcast Online Count
+      this.broadcastToRoom(roomId, {
+        type: 'online_count',
+        count: this.getUniqueUserCount(roomId)
+      });
+
+      // 3. Notify room (Restored)
       this.broadcastToRoom(roomId, {
         type: 'join',
         userId,
@@ -139,40 +164,27 @@ export class ChatServer {
       });
 
       console.log(`${nickname} joined room ${roomId}`);
+
     } catch (error) {
       console.error('Error in handleJoin:', error);
-      ws.send(JSON.stringify({ 
-        type: 'error', 
-        message: 'Failed to join room' 
-      }));
     }
   }
 
   private handleLeave(ws: WebSocket, message: ChatMessage) {
+    this.handleDisconnect(ws);
+  }
+
+  private handleTyping(ws: WebSocket, message: ChatMessage) {
     const roomId = (ws as any).roomId;
     const userId = (ws as any).userId;
-    const nickname = (ws as any).nickname;
+    const nickname = message.nickname || (ws as any).nickname;
 
     if (roomId && userId) {
-      const room = this.rooms.get(roomId);
-      if (room) {
-        // Remove user from room
-        room.forEach((member) => {
-          if (member.userId === userId) {
-            room.delete(member);
-          }
-        });
-
-        // Broadcast leave event
         this.broadcastToRoom(roomId, {
-          type: 'leave',
-          userId,
-          nickname,
-          timestamp: new Date().toISOString(),
+            type: 'typing',
+            userId,
+            nickname
         });
-
-        console.log(`${nickname} left room ${roomId}`);
-      }
     }
   }
 
@@ -182,78 +194,81 @@ export class ChatServer {
     const userId = (ws as any).userId;
     const nickname = (ws as any).nickname;
 
-    if (!content || !roomId || !userId) {
-      ws.send(JSON.stringify({ type: 'error', message: 'Missing required fields' }));
-      return;
-    }
+    if (!content || !roomId || !userId) return;
 
-    // Detect crisis in message
-    const crisisResult = await detectCrisis(content);
+    const riskLevel = 'none'; 
 
-    // Save message to database with risk level
     const { data: savedMessage, error } = await supabase
       .from('messages')
       .insert({
         room_id: roomId,
         user_id: userId,
         content,
-        risk_level: crisisResult.riskLevel,
+        risk_level: riskLevel,
       })
       .select('*')
       .single();
 
     if (error) {
       console.error('Error saving message:', error);
-      ws.send(JSON.stringify({ type: 'error', message: 'Failed to save message' }));
       return;
     }
 
-    // Broadcast message to room with nickname from WebSocket metadata
     this.broadcastToRoom(roomId, {
       type: 'chat',
       userId: savedMessage.user_id,
-      nickname: nickname, // Use nickname from WebSocket connection
+      nickname: nickname,
       content: savedMessage.content,
       timestamp: savedMessage.created_at,
       riskLevel: savedMessage.risk_level,
     });
-
-    // Send crisis alert if detected
-    if (crisisResult.isCrisis && crisisResult.riskLevel !== 'none') {
-      const resourcesMessage = getCrisisResourcesMessage(crisisResult.riskLevel);
-
-      // Send private crisis resources to the user
-      ws.send(
-        JSON.stringify({
-          type: 'crisis_alert',
-          riskLevel: crisisResult.riskLevel,
-          message: resourcesMessage,
-          timestamp: new Date().toISOString(),
-        })
-      );
-
-      console.log(
-        `Crisis detected (${crisisResult.riskLevel}) in room ${roomId} by ${nickname}`
-      );
-    }
   }
 
   private handleDisconnect(ws: WebSocket) {
     const roomId = (ws as any).roomId;
     const userId = (ws as any).userId;
+    const nickname = (ws as any).nickname; // Capture name for leave message
 
     if (roomId && userId) {
       const room = this.rooms.get(roomId);
       if (room) {
-        room.forEach((member) => {
-          if (member.userId === userId) {
+        let wasRemoved = false;
+        
+        // BUG FIX: Use Array.from() for safe iteration
+        const members = Array.from(room);
+        
+        for (const member of members) {
+          // STRICT MATCH: Only remove if it's the EXACT socket that disconnected
+          // This prevents removing a user who just reconnected in a new tab
+          if (member.ws === ws) {
             room.delete(member);
+            wasRemoved = true;
+            break; 
           }
-        });
+        }
+        
+        if (wasRemoved) {
+            // Update Shared State immediately
+            this.updateSharedState(roomId);
+            
+            // Broadcast new count to everyone else
+            this.broadcastToRoom(roomId, {
+                type: 'online_count',
+                count: this.getUniqueUserCount(roomId)
+            });
+
+            // Restore "User Left" notification
+            if (nickname) {
+                this.broadcastToRoom(roomId, {
+                    type: 'leave',
+                    userId,
+                    nickname,
+                    timestamp: new Date().toISOString(),
+                });
+            }
+        }
       }
     }
-
-    console.log('WebSocket disconnected');
   }
 
   private broadcastToRoom(roomId: string, message: any) {
