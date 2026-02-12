@@ -25,13 +25,13 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
   }
 });
 
-// Get LIVE activity count (Reads from memory)
+// Get recent activity count for a room (For the Card display)
 router.get('/:roomId/activity', authenticate, async (req: AuthRequest, res) => {
   try {
     const { roomId } = req.params;
     
-    // FIX: Read from shared memory, NOT database
-    // This gives the INSTANT count of connected sockets
+    // FIX: Read from shared memory logic instead of Database
+    // This provides INSTANT updates when users join/leave
     const liveCount = getRoomCount(roomId);
     
     res.json({ count: liveCount });
@@ -47,6 +47,7 @@ router.get('/:roomId/messages', authenticate, async (req: AuthRequest, res) => {
     const { roomId } = req.params;
     const limit = parseInt(req.query.limit as string) || 50;
 
+    // Fetch messages without joining profiles (will get user data from WebSocket)
     const { data, error } = await supabase
       .from('messages')
       .select('*')

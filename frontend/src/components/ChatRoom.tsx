@@ -28,9 +28,7 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [showCrisisAlert, setShowCrisisAlert] = useState(false);
-  
-  // 1. ADDED: State for online users (Default to 1 because you are online)
-  const [onlineCount, setOnlineCount] = useState(1);
+  const [onlineCount, setOnlineCount] = useState(1); // Default to 1 (you)
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -43,10 +41,10 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
       setMessages((prev) => [
         ...prev,
         {
-          userId: message.userId!,
-          nickname: message.nickname!,
-          content: message.content!,
-          timestamp: message.timestamp!,
+          userId: message.userId,
+          nickname: message.nickname,
+          content: message.content,
+          timestamp: message.timestamp,
           riskLevel: message.riskLevel,
         },
       ]);
@@ -57,7 +55,6 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
         setTimeout(() => setShowCrisisAlert(false), 10000);
       }
     } else if (message.type === 'join') {
-      // User joined notification
       setMessages((prev) => [
         ...prev,
         {
@@ -69,7 +66,6 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
         },
       ]);
     } else if (message.type === 'leave') {
-      // User left notification
       setMessages((prev) => [
         ...prev,
         {
@@ -83,9 +79,8 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
     } else if (message.type === 'crisis_alert') {
       setShowCrisisAlert(true);
       setTimeout(() => setShowCrisisAlert(false), 10000);
-    } 
-    // 2. ADDED: Listener for online count updates
-    else if (message.type === 'online_count') {
+    } else if (message.type === 'online_count') {
+      // Update the online count state
       setOnlineCount(message.count);
     }
   }, []);
@@ -132,7 +127,7 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
           </div>
           <div className="flex items-center gap-4">
             
-            {/* 3. ADDED: Online Count Display */}
+            {/* Online Count Display */}
             <div className="flex items-center gap-2 px-3 py-1 bg-gray-100 rounded-full">
                 <div className={`w-2 h-2 rounded-full ${onlineCount > 0 ? 'bg-green-500' : 'bg-gray-400'}`}></div>
                 <span className="text-xs font-medium text-gray-600">

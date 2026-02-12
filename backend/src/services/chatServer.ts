@@ -1,6 +1,6 @@
 import WebSocket from 'ws';
 import { supabase } from '../lib/supabase';
-import { updateRoomCount } from '../lib/roomState'; // <--- IMPORT THIS
+import { updateRoomCount } from '../lib/roomState'; // Ensure you have this file!
 
 interface ChatMessage {
   type: 'join' | 'leave' | 'chat' | 'crisis_alert' | 'typing' | 'online_count';
@@ -41,15 +41,18 @@ export class ChatServer {
     }, 30000);
   }
 
-  // FIX: Lazy Cleanup - Removes dead sockets while counting
+  // Helper to count UNIQUE users (Includes Lazy Cleanup)
   private getUniqueUserCount(roomId: string): number {
     const room = this.rooms.get(roomId);
     if (!room) return 0;
     
     const uniqueUsers = new Set<string>();
     
-    // Check every member. If their socket is closed, remove them NOW.
-    for (const member of room) {
+    // BUG FIX: Use Array.from() to safely iterate while deleting
+    // Iterating a Set while modifying it causes items to be skipped
+    const members = Array.from(room);
+    
+    for (const member of members) {
         if (member.ws.readyState !== WebSocket.OPEN && member.ws.readyState !== WebSocket.CONNECTING) {
             room.delete(member); // Auto-cleanup dead user
         } else {
@@ -63,7 +66,7 @@ export class ChatServer {
   // Helper to sync state with the API
   private updateSharedState(roomId: string) {
     const count = this.getUniqueUserCount(roomId);
-    updateRoomCount(roomId, count);
+    updateRoomCount(roomId, count); // Sync with shared memory
   }
 
   private handleConnection(ws: WebSocket) {
@@ -90,7 +93,7 @@ export class ChatServer {
         await this.handleJoin(ws, message);
         break;
       case 'leave':
-        this.handleLeave(ws, message);
+        this.handleDisconnect(ws);
         break;
       case 'chat':
         await this.handleChatMessage(ws, message);
@@ -111,8 +114,9 @@ export class ChatServer {
       }
       const room = this.rooms.get(roomId)!;
 
-      // Clean up ANY existing connections for this user ID
-      for (const member of room) {
+      // Clean up old connections for this user (Single device policy)
+      const members = Array.from(room);
+      for (const member of members) {
         if (member.userId === userId) {
           room.delete(member);
           // Force close old socket so it doesn't linger
@@ -151,7 +155,7 @@ export class ChatServer {
         count: this.getUniqueUserCount(roomId)
       });
 
-      // 3. Notify room
+      // 3. Notify room (Restored)
       this.broadcastToRoom(roomId, {
         type: 'join',
         userId,
@@ -222,38 +226,46 @@ export class ChatServer {
 
   private handleDisconnect(ws: WebSocket) {
     const roomId = (ws as any).roomId;
-    
-    // FIX: Robust disconnect handling using Socket Reference
-    if (roomId) {
+    const userId = (ws as any).userId;
+    const nickname = (ws as any).nickname; // Capture name for leave message
+
+    if (roomId && userId) {
       const room = this.rooms.get(roomId);
       if (room) {
-        let nickname = '';
+        let wasRemoved = false;
         
-        // Remove THIS specific socket (more accurate than userId)
-        for (const member of room) {
+        // BUG FIX: Use Array.from() for safe iteration
+        const members = Array.from(room);
+        
+        for (const member of members) {
+          // STRICT MATCH: Only remove if it's the EXACT socket that disconnected
+          // This prevents removing a user who just reconnected in a new tab
           if (member.ws === ws) {
-            nickname = member.nickname;
             room.delete(member);
-            break;
+            wasRemoved = true;
+            break; 
           }
         }
         
-        // Update Shared State immediately
-        this.updateSharedState(roomId);
-        
-        // Broadcast new count to everyone else
-        this.broadcastToRoom(roomId, {
-            type: 'online_count',
-            count: this.getUniqueUserCount(roomId)
-        });
-
-        if (nickname) {
+        if (wasRemoved) {
+            // Update Shared State immediately
+            this.updateSharedState(roomId);
+            
+            // Broadcast new count to everyone else
             this.broadcastToRoom(roomId, {
-                type: 'leave',
-                userId: (ws as any).userId,
-                nickname,
-                timestamp: new Date().toISOString(),
+                type: 'online_count',
+                count: this.getUniqueUserCount(roomId)
             });
+
+            // Restore "User Left" notification
+            if (nickname) {
+                this.broadcastToRoom(roomId, {
+                    type: 'leave',
+                    userId,
+                    nickname,
+                    timestamp: new Date().toISOString(),
+                });
+            }
         }
       }
     }
