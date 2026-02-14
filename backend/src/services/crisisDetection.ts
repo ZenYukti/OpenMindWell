@@ -66,6 +66,8 @@ const CRISIS_KEYWORDS = {
 const HIGH_RISK_EMOTIONS = ['sadness', 'fear', 'anger'];
 const MEDIUM_RISK_EMOTIONS = ['disgust', 'surprise'];
 
+const RISK_LEVELS = ['none', 'low', 'medium', 'high', 'critical'] as const;
+
 /**
  * Analyze message using HuggingFace emotion detection model
  */
@@ -97,7 +99,7 @@ async function analyzeWithHuggingFace(
       return null;
     }
 
-    const result: HuggingFaceResponse[][] = await response.json();
+    const result = await response.json() as HuggingFaceResponse[][];
     return result[0] || null;
   } catch (error) {
     console.error('Error calling HuggingFace API:', error);
@@ -111,46 +113,25 @@ async function analyzeWithHuggingFace(
 function analyzeWithKeywords(message: string): CrisisDetectionResult {
   const lowerMessage = message.toLowerCase();
   const triggeredKeywords: string[] = [];
-  let highestRiskLevel: 'none' | 'low' | 'medium' | 'high' | 'critical' = 'none';
+  let highestRiskLevel: typeof RISK_LEVELS[number] = 'none';
 
-  // Check critical keywords
-  for (const keyword of CRISIS_KEYWORDS.critical) {
-    if (lowerMessage.includes(keyword)) {
-      triggeredKeywords.push(keyword);
-      highestRiskLevel = 'critical';
-    }
-  }
+  // Check all keywords across all levels
+  // Use type assertion to iterate through keys safely
+  const levels = ['critical', 'high', 'medium', 'low'] as const;
 
-  // Check high-risk keywords
-  if (highestRiskLevel !== 'critical') {
-    for (const keyword of CRISIS_KEYWORDS.high) {
+  for (const level of levels) {
+    const keywords = CRISIS_KEYWORDS[level];
+    for (const keyword of keywords) {
       if (lowerMessage.includes(keyword)) {
         triggeredKeywords.push(keyword);
-        if (highestRiskLevel !== 'high') {
-          highestRiskLevel = 'high';
+
+        // Update risk level if this level is higher than current highest
+        const currentLevelIndex = RISK_LEVELS.indexOf(highestRiskLevel);
+        const newLevelIndex = RISK_LEVELS.indexOf(level);
+
+        if (newLevelIndex > currentLevelIndex) {
+          highestRiskLevel = level;
         }
-      }
-    }
-  }
-
-  // Check medium-risk keywords
-  if (highestRiskLevel === 'none' || highestRiskLevel === 'low') {
-    for (const keyword of CRISIS_KEYWORDS.medium) {
-      if (lowerMessage.includes(keyword)) {
-        triggeredKeywords.push(keyword);
-        if (highestRiskLevel !== 'medium' && highestRiskLevel !== 'high') {
-          highestRiskLevel = 'medium';
-        }
-      }
-    }
-  }
-
-  // Check low-risk keywords
-  if (highestRiskLevel === 'none') {
-    for (const keyword of CRISIS_KEYWORDS.low) {
-      if (lowerMessage.includes(keyword)) {
-        triggeredKeywords.push(keyword);
-        highestRiskLevel = 'low';
       }
     }
   }
@@ -175,7 +156,7 @@ export async function detectCrisis(
   if (emotions && emotions.length > 0) {
     // Analyze emotion scores
     const detectedEmotions = emotions.map((e) => e.label);
-    let riskLevel: 'none' | 'low' | 'medium' | 'high' | 'critical' = 'none';
+    let riskLevel: typeof RISK_LEVELS[number] = 'none';
     let maxScore = 0;
 
     for (const emotion of emotions) {
@@ -184,7 +165,10 @@ export async function detectCrisis(
       }
 
       if (HIGH_RISK_EMOTIONS.includes(emotion.label) && emotion.score > 0.5) {
-        riskLevel = emotion.score > 0.7 ? 'high' : 'medium';
+        const potentialRisk = emotion.score > 0.7 ? 'high' : 'medium';
+        if (RISK_LEVELS.indexOf(potentialRisk) > RISK_LEVELS.indexOf(riskLevel)) {
+           riskLevel = potentialRisk;
+        }
       } else if (
         MEDIUM_RISK_EMOTIONS.includes(emotion.label) &&
         emotion.score > 0.6
@@ -197,9 +181,8 @@ export async function detectCrisis(
 
     // Also run keyword analysis and take the higher risk level
     const keywordResult = analyzeWithKeywords(message);
-    const riskLevels = ['none', 'low', 'medium', 'high', 'critical'];
-    const aiRiskIndex = riskLevels.indexOf(riskLevel);
-    const keywordRiskIndex = riskLevels.indexOf(keywordResult.riskLevel);
+    const aiRiskIndex = RISK_LEVELS.indexOf(riskLevel);
+    const keywordRiskIndex = RISK_LEVELS.indexOf(keywordResult.riskLevel);
 
     if (keywordRiskIndex > aiRiskIndex) {
       riskLevel = keywordResult.riskLevel;

@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS messages (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   room_id UUID NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  nickname VARCHAR(50), -- Denormalized for chat history
   content TEXT NOT NULL,
   risk_level VARCHAR(20) DEFAULT 'none' CHECK (risk_level IN ('none', 'low', 'medium', 'high', 'critical')),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

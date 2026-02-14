@@ -1,4 +1,4 @@
-import WebSocket from 'ws';
+import { WebSocket, WebSocketServer } from 'ws';
 import { supabase } from '../lib/supabase';
 import { detectCrisis, getCrisisResourcesMessage } from './crisisDetection';
 
@@ -19,11 +19,12 @@ interface RoomMember {
 }
 
 export class ChatServer {
-  private wss: WebSocket.Server;
-  private rooms: Map<string, Set<RoomMember>>;
+  private wss: WebSocketServer;
+  // RoomId -> UserId -> RoomMember
+  private rooms: Map<string, Map<string, RoomMember>>;
 
   constructor(server: any) {
-    this.wss = new WebSocket.Server({ server });
+    this.wss = new WebSocketServer({ server });
     this.rooms = new Map();
 
     this.wss.on('connection', this.handleConnection.bind(this));
@@ -95,18 +96,19 @@ export class ChatServer {
     try {
       // Add user to room
       if (!this.rooms.has(roomId)) {
-        this.rooms.set(roomId, new Set());
+        this.rooms.set(roomId, new Map());
       }
 
       const room = this.rooms.get(roomId)!;
-      room.add({ ws, userId, nickname });
+      // Use Map to ensure unique user per room (replace old connection if same user joins)
+      room.set(userId, { ws, userId, nickname });
 
       // Store connection metadata
       (ws as any).roomId = roomId;
       (ws as any).userId = userId;
       (ws as any).nickname = nickname;
 
-      // Fetch recent messages from database (without profile join - nicknames come from messages)
+      // Fetch recent messages from database
       const { data: messages, error } = await supabase
         .from('messages')
         .select('*')
@@ -157,21 +159,19 @@ export class ChatServer {
       const room = this.rooms.get(roomId);
       if (room) {
         // Remove user from room
-        room.forEach((member) => {
-          if (member.userId === userId) {
-            room.delete(member);
-          }
-        });
+        if (room.has(userId)) {
+            room.delete(userId);
 
-        // Broadcast leave event
-        this.broadcastToRoom(roomId, {
-          type: 'leave',
-          userId,
-          nickname,
-          timestamp: new Date().toISOString(),
-        });
+            // Broadcast leave event
+            this.broadcastToRoom(roomId, {
+            type: 'leave',
+            userId,
+            nickname,
+            timestamp: new Date().toISOString(),
+            });
 
-        console.log(`${nickname} left room ${roomId}`);
+            console.log(`${nickname} left room ${roomId}`);
+        }
       }
     }
   }
@@ -190,12 +190,13 @@ export class ChatServer {
     // Detect crisis in message
     const crisisResult = await detectCrisis(content);
 
-    // Save message to database with risk level
+    // Save message to database with risk level AND nickname
     const { data: savedMessage, error } = await supabase
       .from('messages')
       .insert({
         room_id: roomId,
         user_id: userId,
+        nickname: nickname, // Added nickname
         content,
         risk_level: crisisResult.riskLevel,
       })
@@ -208,11 +209,11 @@ export class ChatServer {
       return;
     }
 
-    // Broadcast message to room with nickname from WebSocket metadata
+    // Broadcast message to room
     this.broadcastToRoom(roomId, {
       type: 'chat',
       userId: savedMessage.user_id,
-      nickname: nickname, // Use nickname from WebSocket connection
+      nickname: savedMessage.nickname || nickname,
       content: savedMessage.content,
       timestamp: savedMessage.created_at,
       riskLevel: savedMessage.risk_level,
@@ -245,11 +246,13 @@ export class ChatServer {
     if (roomId && userId) {
       const room = this.rooms.get(roomId);
       if (room) {
-        room.forEach((member) => {
-          if (member.userId === userId) {
-            room.delete(member);
-          }
-        });
+        if (room.has(userId)) {
+             // Only remove if the socket matches (in case user reconnected quickly on another socket but same userId)
+             const member = room.get(userId);
+             if (member && member.ws === ws) {
+                 room.delete(userId);
+             }
+        }
       }
     }
 
