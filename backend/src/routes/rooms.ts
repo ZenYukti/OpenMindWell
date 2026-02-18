@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { supabase } from '../lib/supabase';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { getRoomCount } from '../lib/roomState'; // <--- MUST IMPORT THIS
 
 const router = Router();
 
@@ -18,6 +19,22 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
     }
 
     res.json(data || []);
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get recent activity count for a room (For the Card display)
+router.get('/:roomId/activity', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const { roomId } = req.params;
+    
+    // FIX: Read from shared memory logic instead of Database
+    // This provides INSTANT updates when users join/leave
+    const liveCount = getRoomCount(roomId);
+    
+    res.json({ count: liveCount });
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ error: 'Internal server error' });
