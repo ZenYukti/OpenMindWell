@@ -83,12 +83,12 @@ router.put('/:id', authenticate, async (req: AuthRequest, res) => {
       .single();
 
     if (error) {
+      // Check for "no rows found" error code from PostgREST
+      if (error.code === 'PGRST116') {
+        return res.status(404).json({ error: 'Entry not found' });
+      }
       console.error('Error updating journal entry:', error);
       return res.status(500).json({ error: 'Failed to update entry' });
-    }
-
-    if (!data) {
-      return res.status(404).json({ error: 'Entry not found' });
     }
 
     res.json(data);
@@ -104,15 +104,20 @@ router.delete('/:id', authenticate, async (req: AuthRequest, res) => {
     const userId = req.user!.id;
     const { id } = req.params;
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('journal_entries')
       .delete()
       .eq('id', id)
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .select();
 
     if (error) {
       console.error('Error deleting journal entry:', error);
       return res.status(500).json({ error: 'Failed to delete entry' });
+    }
+
+    if (!data || data.length === 0) {
+      return res.status(404).json({ error: 'Entry not found' });
     }
 
     res.status(204).send();

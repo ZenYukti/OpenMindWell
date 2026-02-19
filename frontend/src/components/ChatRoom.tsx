@@ -40,7 +40,7 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
         ...prev,
         {
           userId: message.userId!,
-          nickname: message.nickname!,
+          nickname: message.nickname || 'Anonymous',
           content: message.content!,
           timestamp: message.timestamp!,
           riskLevel: message.riskLevel,
@@ -210,7 +210,7 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
                           : 'text-gray-600'
                       }`}
                     >
-                      {msg.userId === currentUser.id ? 'You' : msg.nickname}
+                      {msg.userId === currentUser.id ? 'You' : (msg.nickname || 'Anonymous')}
                     </span>
                     <span
                       className={`text-xs ${
