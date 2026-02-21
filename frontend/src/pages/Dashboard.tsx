@@ -1,10 +1,20 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getSession, getCurrentUser, getProfile, signOut } from '../lib/supabase';
-import { roomsApi, resourcesApi } from '../lib/api';
+import { roomsApi, resourcesApi, journalApi } from '../lib/api';
 import ChatRoom from '../components/ChatRoom';
 
 type Tab = 'rooms' | 'journal' | 'habits' | 'resources';
+
+interface JournalEntry {
+  id: string;
+  title: string;
+  content: string;
+  created_at: string;
+  mood?: number;
+  tags?: string[];
+  updated_at?: string;
+}
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
@@ -207,6 +217,87 @@ function RoomsTab() {
 }
 
 function JournalTab() {
+  const [entries, setEntries] = useState<JournalEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadEntries() {
+      try {
+        const data = await journalApi.getAll();
+        if (!isMounted) return;
+        setEntries(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error('Error loading journal entries:', err);
+        if (!isMounted) return;
+        setError('Failed to load journal entries.');
+      } finally {
+        if (!isMounted) return;
+        setLoading(false);
+      }
+    }
+
+    loadEntries();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const filteredEntries = normalizedQuery
+    ? entries.filter((entry) => {
+        const title = (entry.title || '').toLowerCase();
+        const content = (entry.content || '').toLowerCase();
+        return title.includes(normalizedQuery) || content.includes(normalizedQuery);
+      })
+    : entries;
+
+  let content;
+
+  if (loading) {
+    content = (
+      <div className="text-center py-8 text-gray-600">
+        Loading your journal entries...
+      </div>
+    );
+  } else if (entries.length === 0) {
+    content = (
+      <div className="text-center py-12 text-gray-500">
+        No journal entries yet.
+      </div>
+    );
+  } else if (normalizedQuery && filteredEntries.length === 0) {
+    content = (
+      <div className="text-center py-12 text-gray-500">
+        No entries match your search.
+      </div>
+    );
+  } else {
+    content = (
+      <div className="space-y-4">
+        {filteredEntries.map((entry) => (
+          <div key={entry.id} className="card">
+            <div className="flex items-start justify-between mb-2">
+              <h3 className="text-lg font-semibold text-gray-900">
+                {entry.title || 'Untitled entry'}
+              </h3>
+              <span className="text-xs text-gray-500">
+                {entry.created_at ? new Date(entry.created_at).toLocaleDateString() : ''}
+              </span>
+            </div>
+            <p className="text-sm text-gray-700 whitespace-pre-line max-h-24 overflow-hidden">
+              {entry.content}
+            </p>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -214,14 +305,23 @@ function JournalTab() {
         <button className="btn-primary">+ New Entry</button>
       </div>
 
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
-        <p className="text-yellow-900">
-          📝 <strong>Journal feature coming soon!</strong> Track your thoughts, moods, and reflections.
-        </p>
-        <p className="text-sm text-yellow-800 mt-2">
-          All journal entries are completely private and only visible to you.
-        </p>
+      <div className="mb-4 max-w-md">
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search by title or content..."
+          className="input-field w-full"
+        />
       </div>
+
+      {error && !loading && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4 text-sm text-red-800">
+          {error}
+        </div>
+      )}
+
+      {content}
     </div>
   );
 }
