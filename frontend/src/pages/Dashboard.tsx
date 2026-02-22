@@ -9,6 +9,7 @@ type Tab = 'rooms' | 'journal' | 'habits' | 'resources';
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('rooms');
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const navigate = useNavigate();
 
@@ -61,19 +62,63 @@ export default function Dashboard() {
           <div className="flex items-center gap-3">
             <div className="text-3xl">{profile?.avatar || '😊'}</div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900">{profile?.nickname || 'User'}</h1>
+              <h1 className="text-xl font-bold text-gray-900 truncate">{profile?.nickname || 'User'}</h1>
               <p className="text-sm text-gray-500">OpenMindWell by ZenYukti</p>
             </div>
           </div>
-          <button onClick={handleSignOut} className="text-sm text-gray-600 hover:text-gray-900">
-            Sign Out
-          </button>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <button onClick={handleSignOut} className="text-sm text-gray-600 hover:text-gray-900">
+              Sign Out
+            </button>
+            <button
+              className="md:hidden text-2xl"
+              onClick={() => setIsMenuOpen(prev => !prev)}
+            >
+              ☰
+            </button>
+          </div>
         </div>
       </header>
 
+      {/* Mobile Menu */}
+      {isMenuOpen && (
+        <div className="md:hidden bg-white border-b border-gray-200 px-4 py-2">
+          <nav className="flex flex-col gap-4">
+            <TabButton active={activeTab === 'rooms'} onClick={() => {
+              setActiveTab('rooms')
+              setIsMenuOpen(false)
+            }}>
+              💬 Rooms
+            </TabButton>
+
+            <TabButton active={activeTab === 'journal'} onClick={() => {
+              setActiveTab('journal')
+              setIsMenuOpen(false)
+            }}>
+              📝 Journal
+            </TabButton>
+
+            <TabButton active={activeTab === 'habits'} onClick={() => {
+              setActiveTab('habits')
+              setIsMenuOpen(false)
+            }}>
+              ✅ Habits
+            </TabButton>
+
+            <TabButton active={activeTab === 'resources'} onClick={() => {
+              setActiveTab('resources')
+              setIsMenuOpen(false)
+            }}>
+              📚 Resources
+            </TabButton>
+          </nav>
+        </div>
+      )}
+
+
       {/* Tabs */}
       <div className="bg-white border-b border-gray-200">
-        <div className="container mx-auto px-4">
+        <div className="hidden md:block container mx-auto px-4">
           <nav className="flex gap-8">
             <TabButton active={activeTab === 'rooms'} onClick={() => setActiveTab('rooms')}>
               💬 Rooms
