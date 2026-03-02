@@ -76,7 +76,6 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
           type: 'system',
         },
       ]);
-      setTimeout(() => setShowCrisisAlert(false), 10000);
     } else if (message.type === 'typing') {
       const { nickname, isTyping } = message;
       setTypingUsers((prev) => {
@@ -92,7 +91,7 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
   }, []);
 
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
-  const typingTimeoutRef = useRef<NodeJS.Timeout>();
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   const { isConnected, connectionError, sendMessage, sendTyping } = useWebSocket({
     roomId: room.id,
@@ -120,7 +119,7 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
     typingTimeoutRef.current = setTimeout(() => {
       sendTyping(false);
       typingTimeoutRef.current = undefined;
-    }, 2000);
+    }, 1000);
   };
 
 
@@ -128,6 +127,16 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
     // Scroll to bottom when new messages arrive
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  useEffect(() => {
+    // Clear typing timeout and reset typing users on unmount
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      setTypingUsers(new Set());
+    };
+  }, []);
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();

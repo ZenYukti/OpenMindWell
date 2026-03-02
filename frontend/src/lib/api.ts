@@ -4,13 +4,11 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001
 async function apiFetch(endpoint: string, options: RequestInit = {}) {
   const { data: { session } } = await (await import('./supabase')).supabase.auth.getSession();
 
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string>),
-  };
+  const headers = new Headers(options.headers);
+  headers.set('Content-Type', 'application/json');
 
   if (session?.access_token) {
-    headers['Authorization'] = `Bearer ${session.access_token}`;
+    headers.set('Authorization', `Bearer ${session.access_token}`);
   }
 
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {

@@ -97,7 +97,7 @@ async function analyzeWithHuggingFace(
       return null;
     }
 
-    const result: HuggingFaceResponse[][] = await response.json();
+    const result = (await response.json()) as HuggingFaceResponse[][];
     return result[0] || null;
   } catch (error) {
     console.error('Error calling HuggingFace API:', error);
@@ -110,49 +110,23 @@ async function analyzeWithHuggingFace(
  */
 function analyzeWithKeywords(message: string): CrisisDetectionResult {
   const lowerMessage = message.toLowerCase();
-  const triggeredKeywords: string[] = [];
+  
+  const foundCritical = CRISIS_KEYWORDS.critical.filter(k => lowerMessage.includes(k));
+  const foundHigh = CRISIS_KEYWORDS.high.filter(k => lowerMessage.includes(k));
+  const foundMedium = CRISIS_KEYWORDS.medium.filter(k => lowerMessage.includes(k));
+  const foundLow = CRISIS_KEYWORDS.low.filter(k => lowerMessage.includes(k));
+  
+  const triggeredKeywords = [...foundCritical, ...foundHigh, ...foundMedium, ...foundLow];
+  
   let highestRiskLevel: 'none' | 'low' | 'medium' | 'high' | 'critical' = 'none';
-
-  // Check critical keywords
-  for (const keyword of CRISIS_KEYWORDS.critical) {
-    if (lowerMessage.includes(keyword)) {
-      triggeredKeywords.push(keyword);
-      highestRiskLevel = 'critical';
-    }
-  }
-
-  // Check high-risk keywords
-  if (highestRiskLevel !== 'critical') {
-    for (const keyword of CRISIS_KEYWORDS.high) {
-      if (lowerMessage.includes(keyword)) {
-        triggeredKeywords.push(keyword);
-        if (highestRiskLevel !== 'high') {
-          highestRiskLevel = 'high';
-        }
-      }
-    }
-  }
-
-  // Check medium-risk keywords
-  if (highestRiskLevel === 'none' || highestRiskLevel === 'low') {
-    for (const keyword of CRISIS_KEYWORDS.medium) {
-      if (lowerMessage.includes(keyword)) {
-        triggeredKeywords.push(keyword);
-        if (highestRiskLevel !== 'medium' && highestRiskLevel !== 'high') {
-          highestRiskLevel = 'medium';
-        }
-      }
-    }
-  }
-
-  // Check low-risk keywords
-  if (highestRiskLevel === 'none') {
-    for (const keyword of CRISIS_KEYWORDS.low) {
-      if (lowerMessage.includes(keyword)) {
-        triggeredKeywords.push(keyword);
-        highestRiskLevel = 'low';
-      }
-    }
+  if (foundCritical.length > 0) {
+    highestRiskLevel = 'critical';
+  } else if (foundHigh.length > 0) {
+    highestRiskLevel = 'high';
+  } else if (foundMedium.length > 0) {
+    highestRiskLevel = 'medium';
+  } else if (foundLow.length > 0) {
+    highestRiskLevel = 'low';
   }
 
   return {

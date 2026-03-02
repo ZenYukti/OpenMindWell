@@ -35,7 +35,7 @@ export function useWebSocket({
   const wsRef = useRef<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const reconnectAttemptsRef = useRef(0);
   const maxReconnectAttempts = 2;
 
@@ -125,6 +125,7 @@ export function useWebSocket({
         );
       }
 
+      wsRef.current.onclose = null; // Prevent reconnect loop
       wsRef.current.close();
       wsRef.current = null;
     }
@@ -173,7 +174,7 @@ export function useWebSocket({
             roomId,
             userId,
             nickname,
-            content: isTyping ? 'true' : 'false',
+            isTyping,
           })
         );
       }
