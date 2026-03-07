@@ -9,7 +9,7 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.id;
 
-    const { data, error } = await supabase
+    const { data: habits, error } = await supabase
       .from('habits')
       .select('*')
       .eq('user_id', userId)
@@ -20,7 +20,68 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
       return res.status(500).json({ error: 'Failed to fetch habits' });
     }
 
-    res.json(data || []);
+    if (!habits) return res.json([]);
+
+    // Fetch all logs for the user to calculate streaks efficiently
+    const { data: allLogs, error: logsError } = await supabase
+      .from('habit_logs')
+      .select('habit_id, completed_at')
+      .eq('user_id', userId)
+      .order('completed_at', { ascending: false });
+
+    if (logsError) {
+      console.error('Error fetching logs for streaks:', logsError);
+      return res.json(habits.map(h => ({ ...h, current_streak: 0 })));
+    }
+
+    const logsByHabit: Record<string, string[]> = {};
+    (allLogs || []).forEach(log => {
+      if (!logsByHabit[log.habit_id]) logsByHabit[log.habit_id] = [];
+      logsByHabit[log.habit_id].push(log.completed_at);
+    });
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const habitsWithStreaks = habits.map(habit => {
+      const logs = logsByHabit[habit.id] || [];
+      const streak = calculateStreakFromLogs(logs);
+      return { ...habit, current_streak: streak };
+    });
+
+    res.json(habitsWithStreaks);
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get today's logs for all habits
+router.get('/today', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const { data, error } = await supabase
+      .from('habit_logs')
+      .select('*')
+      .eq('user_id', userId)
+      .gte('completed_at', today.toISOString());
+
+    if (error) {
+      console.error('Error fetching today\'s logs:', error);
+      return res.status(500).json({ error: 'Failed to fetch logs' });
+    }
+
+    const logsByHabit = (data || []).reduce((acc: any, log: any) => {
+      acc[log.habit_id] = log;
+      return acc;
+    }, {});
+
+    res.json(logsByHabit);
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -83,7 +144,10 @@ router.post('/:id/log', authenticate, async (req: AuthRequest, res) => {
       return res.status(500).json({ error: 'Failed to log habit' });
     }
 
-    res.status(201).json(data);
+    // Calculate new streak
+    const newStreak = await calculateHabitStreak(id, userId);
+
+    res.status(201).json({ ...data, new_streak: newStreak });
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -175,3 +239,54 @@ router.delete('/:id', authenticate, async (req: AuthRequest, res) => {
 });
 
 export default router;
+
+// Helper to calculate streak from a list of completion timestamps (ISO strings)
+function calculateStreakFromLogs(logs: string[]): number {
+  if (!logs || logs.length === 0) return 0;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  const lastLogDate = new Date(logs[0]);
+  lastLogDate.setHours(0, 0, 0, 0);
+
+  if (lastLogDate.getTime() < yesterday.getTime()) return 0;
+
+  let streak = 0;
+  let expectedDate = new Date(today);
+  if (lastLogDate.getTime() === yesterday.getTime()) {
+    expectedDate = new Date(yesterday);
+  }
+
+  let lastDayProcessed = -1;
+  for (const logAt of logs) {
+    const logDate = new Date(logAt);
+    logDate.setHours(0, 0, 0, 0);
+
+    if (logDate.getTime() === lastDayProcessed) continue;
+
+    if (logDate.getTime() === expectedDate.getTime()) {
+      streak++;
+      expectedDate.setDate(expectedDate.getDate() - 1);
+      lastDayProcessed = logDate.getTime();
+    } else if (logDate.getTime() < expectedDate.getTime()) {
+      break;
+    }
+  }
+  return streak;
+}
+
+// Helper to calculate streak for a single habit from DB
+async function calculateHabitStreak(habitId: string, userId: string): Promise<number> {
+  const { data: logs, error } = await supabase
+    .from('habit_logs')
+    .select('completed_at')
+    .eq('habit_id', habitId)
+    .eq('user_id', userId)
+    .order('completed_at', { ascending: false });
+
+  if (error || !logs) return 0;
+  return calculateStreakFromLogs(logs.map(l => l.completed_at));
+}
