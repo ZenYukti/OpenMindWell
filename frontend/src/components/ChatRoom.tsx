@@ -79,13 +79,15 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
         },
       ]);
     } else if (message.type === 'typing') {
-      const { nickname, isTyping } = message;
+      const { userId, isTyping } = message;
       setTypingUsers((prev) => {
         const newSet = new Set(prev);
-        if (isTyping) {
-          newSet.add(nickname);
-        } else {
-          newSet.delete(nickname);
+        if (userId) {
+          if (isTyping) {
+            newSet.add(userId);
+          } else {
+            newSet.delete(userId);
+          }
         }
         return newSet;
       });
