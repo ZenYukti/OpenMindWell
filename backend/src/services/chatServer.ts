@@ -2,18 +2,26 @@ import WebSocket from 'ws';
 import { supabase } from '../lib/supabase';
 import { detectCrisis, getCrisisResourcesMessage } from './crisisDetection';
 
+export interface AuthenticatedWebSocket extends WebSocket {
+  isAlive?: boolean;
+  roomId?: string;
+  userId?: string;
+  nickname?: string;
+}
+
 interface ChatMessage {
-  type: 'join' | 'leave' | 'chat' | 'crisis_alert';
+  type: 'join' | 'leave' | 'chat' | 'crisis_alert' | 'typing';
   roomId?: string;
   userId?: string;
   nickname?: string;
   content?: string;
   riskLevel?: string;
   timestamp?: string;
+  isTyping?: boolean;
 }
 
 interface RoomMember {
-  ws: WebSocket;
+  ws: AuthenticatedWebSocket;
   userId: string;
   nickname: string;
 }
@@ -30,7 +38,8 @@ export class ChatServer {
 
     // Heartbeat to detect dead connections
     setInterval(() => {
-      this.wss.clients.forEach((ws: any) => {
+      this.wss.clients.forEach((client) => {
+        const ws = client as AuthenticatedWebSocket;
         if (ws.isAlive === false) {
           return ws.terminate();
         }
@@ -40,12 +49,13 @@ export class ChatServer {
     }, 30000);
   }
 
-  private handleConnection(ws: WebSocket) {
+  private handleConnection(client: WebSocket) {
+    const ws = client as AuthenticatedWebSocket;
     console.log('New WebSocket connection');
 
-    (ws as any).isAlive = true;
+    ws.isAlive = true;
     ws.on('pong', () => {
-      (ws as any).isAlive = true;
+      ws.isAlive = true;
     });
 
     ws.on('message', async (data: string) => {
@@ -68,7 +78,7 @@ export class ChatServer {
     });
   }
 
-  private async handleMessage(ws: WebSocket, message: ChatMessage) {
+  private async handleMessage(ws: AuthenticatedWebSocket, message: ChatMessage) {
     switch (message.type) {
       case 'join':
         await this.handleJoin(ws, message);
@@ -79,12 +89,30 @@ export class ChatServer {
       case 'chat':
         await this.handleChatMessage(ws, message);
         break;
+      case 'typing':
+        this.handleTyping(ws, message);
+        break;
       default:
         ws.send(JSON.stringify({ type: 'error', message: 'Unknown message type' }));
     }
   }
 
-  private async handleJoin(ws: WebSocket, message: ChatMessage) {
+  private handleTyping(ws: AuthenticatedWebSocket, message: ChatMessage) {
+    const { roomId, userId, nickname } = ws;
+
+    if (roomId && userId) {
+      const isTyping = typeof message.isTyping === 'boolean' ? message.isTyping : false;
+      // Broadcast to other users in the room
+      this.broadcastToRoom(roomId, {
+        type: 'typing',
+        userId,
+        nickname,
+        isTyping,
+      }, userId); // Exclude sender
+    }
+  }
+
+  private async handleJoin(ws: AuthenticatedWebSocket, message: ChatMessage) {
     const { roomId, userId, nickname } = message;
 
     if (!roomId || !userId || !nickname) {
@@ -102,9 +130,9 @@ export class ChatServer {
       room.add({ ws, userId, nickname });
 
       // Store connection metadata
-      (ws as any).roomId = roomId;
-      (ws as any).userId = userId;
-      (ws as any).nickname = nickname;
+      ws.roomId = roomId;
+      ws.userId = userId;
+      ws.nickname = nickname;
 
       // Fetch recent messages from database (without profile join - nicknames come from messages)
       const { data: messages, error } = await supabase
@@ -148,10 +176,8 @@ export class ChatServer {
     }
   }
 
-  private handleLeave(ws: WebSocket, message: ChatMessage) {
-    const roomId = (ws as any).roomId;
-    const userId = (ws as any).userId;
-    const nickname = (ws as any).nickname;
+  private handleLeave(ws: AuthenticatedWebSocket, message: ChatMessage) {
+    const { roomId, userId, nickname } = ws;
 
     if (roomId && userId) {
       const room = this.rooms.get(roomId);
@@ -170,17 +196,23 @@ export class ChatServer {
           nickname,
           timestamp: new Date().toISOString(),
         });
+        
+        // Clear typing indicator for leaving user
+        this.broadcastToRoom(roomId, {
+          type: 'typing',
+          userId,
+          nickname,
+          isTyping: false,
+        });
 
         console.log(`${nickname} left room ${roomId}`);
       }
     }
   }
 
-  private async handleChatMessage(ws: WebSocket, message: ChatMessage) {
+  private async handleChatMessage(ws: AuthenticatedWebSocket, message: ChatMessage) {
     const { content } = message;
-    const roomId = (ws as any).roomId;
-    const userId = (ws as any).userId;
-    const nickname = (ws as any).nickname;
+    const { roomId, userId, nickname } = ws;
 
     if (!content || !roomId || !userId) {
       ws.send(JSON.stringify({ type: 'error', message: 'Missing required fields' }));
@@ -238,9 +270,8 @@ export class ChatServer {
     }
   }
 
-  private handleDisconnect(ws: WebSocket) {
-    const roomId = (ws as any).roomId;
-    const userId = (ws as any).userId;
+  private handleDisconnect(ws: AuthenticatedWebSocket) {
+    const { roomId, userId } = ws;
 
     if (roomId && userId) {
       const room = this.rooms.get(roomId);
@@ -250,19 +281,27 @@ export class ChatServer {
             room.delete(member);
           }
         });
+        
+        // Clear typing indicator for disconnected user
+        this.broadcastToRoom(roomId, {
+          type: 'typing',
+          userId,
+          nickname: ws.nickname,
+          isTyping: false,
+        });
       }
     }
 
     console.log('WebSocket disconnected');
   }
 
-  private broadcastToRoom(roomId: string, message: any) {
+  private broadcastToRoom(roomId: string, message: any, excludeUserId?: string) {
     const room = this.rooms.get(roomId);
     if (!room) return;
 
     const messageStr = JSON.stringify(message);
     room.forEach((member) => {
-      if (member.ws.readyState === WebSocket.OPEN) {
+      if (member.userId !== excludeUserId && member.ws.readyState === WebSocket.OPEN) {
         member.ws.send(messageStr);
       }
     });

@@ -24,6 +24,8 @@ interface ChatRoomProps {
   onClose: () => void;
 }
 
+const EMPTY_SET = new Set<string>();
+
 export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -76,13 +78,26 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
           type: 'system',
         },
       ]);
-    } else if (message.type === 'crisis_alert') {
-      setShowCrisisAlert(true);
-      setTimeout(() => setShowCrisisAlert(false), 10000);
+    } else if (message.type === 'typing') {
+      const { userId, isTyping } = message;
+      setTypingUsers((prev) => {
+        const newSet = new Set(prev);
+        if (userId) {
+          if (isTyping) {
+            newSet.add(userId);
+          } else {
+            newSet.delete(userId);
+          }
+        }
+        return newSet;
+      });
     }
   }, []);
 
-  const { isConnected, connectionError, sendMessage } = useWebSocket({
+  const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const { isConnected, connectionError, sendMessage, sendTyping } = useWebSocket({
     roomId: room.id,
     userId: currentUser.id,
     nickname: currentUser.nickname,
@@ -95,10 +110,37 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
     },
   });
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value);
+
+    // Debounce typing indicator
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    } else {
+      sendTyping(true);
+    }
+
+    typingTimeoutRef.current = setTimeout(() => {
+      sendTyping(false);
+      typingTimeoutRef.current = undefined;
+    }, 2000);
+  };
+
+
   useEffect(() => {
     // Scroll to bottom when new messages arrive
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  useEffect(() => {
+    // Clear typing timeout and reset typing users on unmount
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      setTypingUsers(prev => prev.size > 0 ? EMPTY_SET : prev);
+    };
+  }, []);
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -248,13 +290,20 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
           <div ref={messagesEndRef} />
         </div>
 
+        {/* Typing Indicator */}
+        {typingUsers.size > 0 && (
+          <div className="px-4 py-2 text-xs text-gray-500 italic bg-gray-50 border-t border-gray-100">
+            {Array.from(typingUsers).join(', ')} {typingUsers.size === 1 ? 'is' : 'are'} typing...
+          </div>
+        )}
+
         {/* Input */}
         <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-200 bg-white">
           <div className="flex gap-2">
             <input
               type="text"
               value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
+              onChange={handleInputChange}
               placeholder={isConnected ? 'Type your message...' : 'Connecting...'}
               disabled={!isConnected}
               className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"

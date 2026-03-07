@@ -97,7 +97,7 @@ async function analyzeWithHuggingFace(
       return null;
     }
 
-    const result: HuggingFaceResponse[][] = await response.json();
+    const result = (await response.json()) as HuggingFaceResponse[][];
     return result[0] || null;
   } catch (error) {
     console.error('Error calling HuggingFace API:', error);
@@ -110,48 +110,22 @@ async function analyzeWithHuggingFace(
  */
 function analyzeWithKeywords(message: string): CrisisDetectionResult {
   const lowerMessage = message.toLowerCase();
-  const triggeredKeywords: string[] = [];
   let highestRiskLevel: 'none' | 'low' | 'medium' | 'high' | 'critical' = 'none';
+  const triggeredKeywords: string[] = [];
 
-  // Check critical keywords
-  for (const keyword of CRISIS_KEYWORDS.critical) {
-    if (lowerMessage.includes(keyword)) {
-      triggeredKeywords.push(keyword);
-      highestRiskLevel = 'critical';
-    }
-  }
+  const riskMap = {
+    critical: CRISIS_KEYWORDS.critical,
+    high: CRISIS_KEYWORDS.high,
+    medium: CRISIS_KEYWORDS.medium,
+    low: CRISIS_KEYWORDS.low,
+  } as const;
 
-  // Check high-risk keywords
-  if (highestRiskLevel !== 'critical') {
-    for (const keyword of CRISIS_KEYWORDS.high) {
-      if (lowerMessage.includes(keyword)) {
-        triggeredKeywords.push(keyword);
-        if (highestRiskLevel !== 'high') {
-          highestRiskLevel = 'high';
-        }
-      }
-    }
-  }
-
-  // Check medium-risk keywords
-  if (highestRiskLevel === 'none' || highestRiskLevel === 'low') {
-    for (const keyword of CRISIS_KEYWORDS.medium) {
-      if (lowerMessage.includes(keyword)) {
-        triggeredKeywords.push(keyword);
-        if (highestRiskLevel !== 'medium' && highestRiskLevel !== 'high') {
-          highestRiskLevel = 'medium';
-        }
-      }
-    }
-  }
-
-  // Check low-risk keywords
-  if (highestRiskLevel === 'none') {
-    for (const keyword of CRISIS_KEYWORDS.low) {
-      if (lowerMessage.includes(keyword)) {
-        triggeredKeywords.push(keyword);
-        highestRiskLevel = 'low';
-      }
+  for (const [level, keywords] of Object.entries(riskMap)) {
+    const found = keywords.filter((k) => lowerMessage.includes(k));
+    if (found.length > 0) {
+      triggeredKeywords.push(...found);
+      highestRiskLevel = level as typeof highestRiskLevel;
+      break;
     }
   }
 

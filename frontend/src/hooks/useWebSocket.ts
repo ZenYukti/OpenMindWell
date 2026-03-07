@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 
 interface ChatMessage {
-  type: 'join' | 'leave' | 'chat' | 'crisis_alert' | 'history' | 'error';
+  type: 'join' | 'leave' | 'chat' | 'crisis_alert' | 'history' | 'error' | 'typing';
   roomId?: string;
   userId?: string;
   nickname?: string;
@@ -10,6 +10,7 @@ interface ChatMessage {
   timestamp?: string;
   messages?: any[];
   message?: string;
+  isTyping?: boolean;
 }
 
 interface UseWebSocketOptions {
@@ -34,11 +35,13 @@ export function useWebSocket({
   const wsRef = useRef<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const reconnectAttemptsRef = useRef(0);
+  const isManualCloseRef = useRef(false);
   const maxReconnectAttempts = 2;
 
   const connect = useCallback(() => {
+    isManualCloseRef.current = false;
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       return;
     }
@@ -87,7 +90,7 @@ export function useWebSocket({
         onDisconnect?.();
 
         // Attempt to reconnect with longer delays
-        if (reconnectAttemptsRef.current < maxReconnectAttempts) {
+        if (!isManualCloseRef.current && reconnectAttemptsRef.current < maxReconnectAttempts) {
           reconnectAttemptsRef.current += 1;
           const delay = Math.min(3000 * Math.pow(2, reconnectAttemptsRef.current), 10000);
           console.log(`Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current})`);
@@ -95,7 +98,7 @@ export function useWebSocket({
           reconnectTimeoutRef.current = setTimeout(() => {
             connect();
           }, delay);
-        } else {
+        } else if (!isManualCloseRef.current) {
           setConnectionError('Connection lost. Please refresh to reconnect.');
         }
       };
@@ -124,6 +127,7 @@ export function useWebSocket({
         );
       }
 
+      isManualCloseRef.current = true;
       wsRef.current.close();
       wsRef.current = null;
     }
@@ -164,6 +168,19 @@ export function useWebSocket({
     isConnected,
     connectionError,
     sendMessage,
+    sendTyping: (isTyping: boolean) => {
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(
+          JSON.stringify({
+            type: 'typing',
+            roomId,
+            userId,
+            nickname,
+            isTyping,
+          })
+        );
+      }
+    },
     reconnect: connect,
     disconnect,
   };
