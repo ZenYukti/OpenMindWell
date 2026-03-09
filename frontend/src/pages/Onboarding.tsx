@@ -55,8 +55,8 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center px-4">
-      <div className="max-w-md w-full">
+    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center px-4 py-6 overflow-x-hidden">
+      <div className="max-w-md w-full min-w-0">
         {/* Crisis Banner */}
         <div className="bg-red-600 text-white py-2 px-4 rounded-lg text-center text-sm mb-6">
           <strong>⚠️ IN CRISIS?</strong> 🇺🇸 988 | 🇮🇳 9152987821 (iCall) | KIRAN 1800-599-0019
@@ -90,21 +90,21 @@ export default function Onboarding() {
               <p className="text-xs text-gray-500 mt-1">3-20 characters, no personal info</p>
             </div>
 
-            {/* Avatar Selection */}
-            <div className="mb-6">
+            {/* Avatar Selection - responsive for mobile */}
+            <div className="mb-6 min-w-0">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Choose an Avatar
               </label>
-              <div className="grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-4 sm:grid-cols-5 gap-2 sm:gap-2">
                 {AVATAR_OPTIONS.map((avatar) => (
                   <button
                     key={avatar}
                     type="button"
                     onClick={() => setSelectedAvatar(avatar)}
-                    className={`text-4xl p-3 rounded-lg border-2 transition-all ${
+                    className={`min-h-[48px] min-w-[48px] sm:min-h-[52px] sm:min-w-[52px] flex items-center justify-center text-2xl sm:text-3xl md:text-4xl p-2 sm:p-3 rounded-lg border-2 transition-all touch-manipulation ${
                       selectedAvatar === avatar
-                        ? 'border-primary-600 bg-primary-50 scale-110'
-                        : 'border-gray-300 hover:border-primary-400'
+                        ? 'border-primary-600 bg-primary-50 scale-105 sm:scale-110'
+                        : 'border-gray-300 hover:border-primary-400 active:border-primary-400'
                     }`}
                     disabled={loading}
                   >

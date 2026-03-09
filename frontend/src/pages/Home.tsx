@@ -11,10 +11,14 @@ export default function Home() {
   }, []);
 
   async function checkSession() {
-    const session = await getSession();
-    if (session) {
-      navigate('/dashboard');
-    } else {
+    try {
+      const session = await getSession();
+      if (session) {
+        navigate('/dashboard');
+      }
+    } catch {
+      // ignore
+    } finally {
       setLoading(false);
     }
   }
