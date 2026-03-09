@@ -1,5 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
+import {
+  getMessageStats,
+  getWarningMessage,
+  isSendButtonDisabled,
+  validateMessage,
+} from '../lib/messageValidation';
 
 interface Message {
   id?: string;
@@ -28,7 +34,12 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [showCrisisAlert, setShowCrisisAlert] = useState(false);
+  const [validationError, setValidationError] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const stats = getMessageStats(inputValue);
+  const warningMessage = getWarningMessage(inputValue);
+  const sendDisabled = isSendButtonDisabled(inputValue);
 
   const handleMessage = useCallback((message: any) => {
     if (message.type === 'history') {
@@ -79,6 +90,8 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
     } else if (message.type === 'crisis_alert') {
       setShowCrisisAlert(true);
       setTimeout(() => setShowCrisisAlert(false), 10000);
+    } else if (message.type === 'error' && message.message) {
+      setValidationError(message.message);
     }
   }, []);
 
@@ -102,8 +115,13 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
+    setValidationError('');
 
-    if (!inputValue.trim() || !isConnected) {
+    if (!isConnected) return;
+
+    const result = validateMessage(inputValue);
+    if (!result.isValid) {
+      setValidationError(result.error || 'Invalid message');
       return;
     }
 
@@ -210,7 +228,7 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
                           : 'text-gray-600'
                       }`}
                     >
-                      {msg.userId === currentUser.id ? 'You' : msg.nickname}
+                      {msg.userId === currentUser.id ? 'You' : (msg.nickname || 'Anonymous')}
                     </span>
                     <span
                       className={`text-xs ${
@@ -221,10 +239,12 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
                           : 'text-gray-400'
                       }`}
                     >
-                      {new Date(msg.timestamp).toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                      {(() => {
+                        const d = new Date(msg.timestamp);
+                        const isValid = !Number.isNaN(d.getTime());
+                        if (isValid) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        return msg.userId === currentUser.id ? 'You' : (msg.nickname || 'Anonymous');
+                      })()}
                     </span>
                   </div>
                   <p
@@ -250,11 +270,19 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
 
         {/* Input */}
         <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-200 bg-white">
+          {validationError && (
+            <div className="mb-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
+              {validationError}
+            </div>
+          )}
           <div className="flex gap-2">
             <input
               type="text"
               value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
+              onChange={(e) => {
+                setInputValue(e.target.value);
+                setValidationError('');
+              }}
               placeholder={isConnected ? 'Type your message...' : 'Connecting...'}
               disabled={!isConnected}
               className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
@@ -262,15 +290,25 @@ export default function ChatRoom({ room, currentUser, onClose }: ChatRoomProps) 
             />
             <button
               type="submit"
-              disabled={!isConnected || !inputValue.trim()}
+              disabled={!isConnected || sendDisabled}
               className="btn-primary px-6 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Send
             </button>
           </div>
-          <p className="text-xs text-gray-500 mt-2">
-            💡 Be kind and supportive. All messages are monitored for safety.
-          </p>
+          <div className="mt-2 flex items-center justify-between">
+            <p className="text-xs text-gray-500">
+              💡 Be kind and supportive. All messages are monitored for safety.
+            </p>
+            <span
+              className={`text-xs tabular-nums ${
+                stats.isNearLimit ? (stats.percentUsed >= 95 ? 'text-red-600 font-medium' : 'text-amber-600') : 'text-gray-500'
+              }`}
+            >
+              {stats.characterCount} / {stats.maxLength}
+              {warningMessage && ` · ${warningMessage}`}
+            </span>
+          </div>
         </form>
       </div>
     </div>
